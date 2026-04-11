@@ -1,0 +1,24 @@
+[tools]
+bun = "1.3.12"
+
+[settings]
+experimental = true
+pin = true
+
+[hooks]
+postinstall = "bun install"
+
+[env]
+_.path = "node_modules/.bin"
+
+[tasks.dev]
+description = "Start development server"
+run = "astro dev"
+
+[tasks.build]
+description = "Build the project"
+run = "astro build"
+
+[tasks.preview]
+description = "Preview the build"
+run = "astro preview"
