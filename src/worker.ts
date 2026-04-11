@@ -82,7 +82,7 @@ export default {
           from: env.FROM_EMAIL,
         });
       }
-    } else if (cron === "0 16 * * 0") {
+    } else if (cron === "0 16 * * SUN") {
       // Sunday: recap to participants only
       // On Sunday, yesterday was Saturday
       const recapKey = (() => {

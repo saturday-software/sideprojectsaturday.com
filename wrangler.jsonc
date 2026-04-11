@@ -1,57 +1,53 @@
 {
-	"compatibility_date": "2026-04-11",
-	"compatibility_flags": ["global_fetch_strictly_public"],
-	"name": "sideprojectsaturday",
-	"main": "./src/worker.ts",
-	"assets": {
-		"directory": "./dist",
-		"binding": "ASSETS"
-	},
-	"observability": {
-		"enabled": true
-	},
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "EVENT_DO",
-				"class_name": "EventDO"
-			}
-		]
-	},
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": ["EventDO"]
-		}
-	],
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "sps-db",
-			"database_id": "local"
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "IMAGES_BUCKET",
-			"bucket_name": "sps-images"
-		}
-	],
-	"send_email": [
-		{
-			"name": "EMAIL"
-		}
-	],
-	"triggers": {
-		"crons": [
-			"0 13 * * 3",
-			"0 13 * * 5",
-			"0 16 * * 0"
-		]
-	},
-	"vars": {
-		"SITE_URL": "https://sideprojectsaturday.com",
-		"FROM_EMAIL": "hello@sideprojectsaturday.com",
-		"EVENT_ADDRESS": "325 Gold St #503"
-	}
+  "compatibility_date": "2026-04-11",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "name": "side-project-saturday",
+  "main": "./src/worker.ts",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "EVENT_DO",
+        "class_name": "EventDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["EventDO"],
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "sps",
+      "database_id": "a1ce3813-51bf-4ebf-9ca3-d9f50b7d6925",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "IMAGES_BUCKET",
+      "bucket_name": "sps-images",
+    },
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL",
+    },
+  ],
+  "triggers": {
+    "crons": ["0 13 * * 3", "0 13 * * 5", "0 16 * * SUN"],
+  },
+  "vars": {
+    "SITE_URL": "https://sideprojectsaturday.com",
+    "FROM_EMAIL": "hello@sideprojectsaturday.com",
+    "EVENT_ADDRESS": "325 Gold St #503",
+  },
 }
