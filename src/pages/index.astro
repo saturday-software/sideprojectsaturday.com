@@ -1,11 +1,22 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
+import Layout from "../layouts/Layout.astro";
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const message = Astro.url.searchParams.get("message");
+const error = Astro.url.searchParams.get("error");
 ---
 
 <Layout>
-	<Welcome />
+  <h1>Side Project Saturday</h1>
+  <p>A small, local weekly meetup to focus on side projects and share demos.</p>
+
+  {message && <div class="message success">{message}</div>}
+  {error && <div class="message error">{error}</div>}
+
+  <form method="POST" action="/api/subscribe" style="margin-top: 24px;">
+    <label for="email">Get weekly updates</label>
+    <div style="display: flex; gap: 8px;">
+      <input type="email" id="email" name="email" placeholder="your@email.com" required />
+      <button type="submit">Subscribe</button>
+    </div>
+  </form>
 </Layout>

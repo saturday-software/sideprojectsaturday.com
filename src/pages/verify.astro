@@ -1,0 +1,28 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { verifySubscriber } from "../lib/subscribers";
+
+const token = Astro.url.searchParams.get("token");
+let success = false;
+
+if (token) {
+  const db = Astro.locals.runtime.env.DB;
+  success = await verifySubscriber(db, token);
+}
+---
+
+<Layout title="Verify Email — Side Project Saturday">
+  {success ? (
+    <div>
+      <h1>You're in!</h1>
+      <p>Your email has been verified. You'll get weekly updates about Side Project Saturday.</p>
+      <a href="/">← Back home</a>
+    </div>
+  ) : (
+    <div>
+      <h1>Invalid or expired link</h1>
+      <p>This verification link is no longer valid. Try subscribing again.</p>
+      <a href="/">← Back home</a>
+    </div>
+  )}
+</Layout>

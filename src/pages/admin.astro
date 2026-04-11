@@ -1,0 +1,80 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { isAdmin } from "../lib/auth";
+import { getCurrentSaturday, formatEventDate } from "../lib/dates";
+import { getSubscriberCount } from "../lib/subscribers";
+import type { EventDO } from "../do/EventDO";
+
+const env = Astro.locals.runtime.env;
+const authenticated = isAdmin(Astro.request, env.ADMIN_PASSWORD);
+
+let saturdayKey = "";
+let eventDate = "";
+let cancelled = false;
+let subscriberCount = { total: 0, verified: 0 };
+
+if (authenticated) {
+  saturdayKey = getCurrentSaturday();
+  eventDate = formatEventDate(saturdayKey);
+
+  const id = env.EVENT_DO.idFromName(saturdayKey);
+  const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+  await stub.init(saturdayKey);
+  cancelled = await stub.isCancelled();
+
+  subscriberCount = await getSubscriberCount(env.DB);
+}
+
+const message = Astro.url.searchParams.get("message");
+---
+
+<Layout title="Admin — Side Project Saturday">
+  {!authenticated ? (
+    <div>
+      <h1>Admin Login</h1>
+      <form method="POST" action="/api/admin/login">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required />
+        <button type="submit">Log in</button>
+      </form>
+    </div>
+  ) : (
+    <div>
+      <h1>Admin</h1>
+
+      {message && <div class="message success">{message}</div>}
+
+      <section style="margin-bottom: 32px;">
+        <h2>Next Event</h2>
+        <p><strong>{eventDate}</strong></p>
+        <p>Status: {cancelled ? "Cancelled" : "Active"}</p>
+        <form method="POST" action="/api/admin/cancel" style="display: inline;">
+          <input type="hidden" name="date" value={saturdayKey} />
+          <button type="submit">{cancelled ? "Uncancel" : "Cancel Event"}</button>
+        </form>
+      </section>
+
+      <section style="margin-bottom: 32px;">
+        <h2>Upload Event Image</h2>
+        <form method="POST" action="/api/admin/upload-image" enctype="multipart/form-data">
+          <input type="hidden" name="date" value={saturdayKey} />
+          <input type="file" name="image" accept="image/*" required style="margin-bottom: 8px;" />
+          <button type="submit">Upload</button>
+        </form>
+      </section>
+
+      <section style="margin-bottom: 32px;">
+        <h2>Subscribers</h2>
+        <p>Total: {subscriberCount.total} | Verified: {subscriberCount.verified}</p>
+      </section>
+
+      <section>
+        <h2>Links</h2>
+        <ul style="list-style: none; padding: 0;">
+          <li style="margin-bottom: 8px;"><a href={`/event/${saturdayKey}`}>Event page →</a></li>
+          <li style="margin-bottom: 8px;"><a href={`/recap/${saturdayKey}`}>Recap page →</a></li>
+        </ul>
+      </section>
+    </div>
+  )}
+</Layout>

@@ -1,0 +1,26 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { unsubscribe } from "../lib/subscribers";
+
+const email = Astro.url.searchParams.get("email");
+let success = false;
+
+if (email) {
+  const db = Astro.locals.runtime.env.DB;
+  success = await unsubscribe(db, decodeURIComponent(email));
+}
+---
+
+<Layout title="Unsubscribe — Side Project Saturday">
+  {success ? (
+    <div>
+      <h1>Unsubscribed</h1>
+      <p>You've been removed from the mailing list. Sorry to see you go!</p>
+    </div>
+  ) : (
+    <div>
+      <h1>Something went wrong</h1>
+      <p>We couldn't process your unsubscribe request. The email may not be in our system.</p>
+    </div>
+  )}
+</Layout>

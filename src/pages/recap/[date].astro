@@ -1,0 +1,47 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { formatEventDate } from "../../lib/dates";
+import type { EventDO } from "../../do/EventDO";
+
+const { date } = Astro.params;
+if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  return Astro.redirect("/");
+}
+
+const env = Astro.locals.runtime.env;
+const id = env.EVENT_DO.idFromName(date);
+const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+
+const submissions = await stub.getPublicSubmissions();
+const imageKey = await stub.getImageKey();
+const eventDate = formatEventDate(date);
+---
+
+<Layout title={`Recap: ${eventDate} — Side Project Saturday`}>
+  <h1>Recap</h1>
+  <p><strong>{eventDate}</strong></p>
+
+  {imageKey && (
+    <img
+      src={`/api/image/${imageKey}`}
+      alt="Event photo"
+      style="width: 100%; border-radius: 8px; margin-bottom: 24px;"
+    />
+  )}
+
+  {submissions.length > 0 ? (
+    <div>
+      {submissions.map((s) => (
+        <div style="margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #eee; border-radius: 8px;">
+          <h2 style="margin-bottom: 4px;">{s.project_name}</h2>
+          <p style="margin-bottom: 4px; color: #666;">by {s.participant_name}</p>
+          <p style="margin-bottom: 0;">{s.description}</p>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p>No projects were submitted for this event.</p>
+  )}
+
+  <p style="margin-top: 32px;"><a href="/">← Back home</a></p>
+</Layout>
