@@ -5,6 +5,7 @@ import MarkdownEditor from "@/components/MarkdownEditor.astro";
 import Tip from "@/components/Tip.astro";
 import { resolveShareCode } from "@/lib/share";
 import { ensureEvent, isEventCancelled } from "@/lib/events";
+import { dateKeyToSlug } from "@/lib/dates";
 import { env } from "cloudflare:workers";
 
 const { code } = Astro.params;
@@ -20,6 +21,8 @@ if (!date) {
 await ensureEvent(env.DB, date);
 const cancelled = await isEventCancelled(env.DB, date);
 const eventDate = date;
+const eventSlug = dateKeyToSlug(date);
+const uploadSource = `submission:${eventSlug}`;
 
 const result = Astro.getActionResult(actions.events.submit);
 if (result?.data) {
@@ -83,6 +86,7 @@ const error = result?.error?.message;
             id="project_summary"
             name="description"
             label="project summary"
+            uploadSource={uploadSource}
           >
             <Tip text="Shared publicly on the event page. Leave empty to opt out. Markdown is supported." />
           </MarkdownEditor>
@@ -91,6 +95,7 @@ const error = result?.error?.message;
             id="private_details"
             name="private_details"
             label="note for attendees"
+            uploadSource={uploadSource}
           >
             <Tip text="Will only be shared with other attendees in the recap email. Markdown is supported." />
           </MarkdownEditor>
