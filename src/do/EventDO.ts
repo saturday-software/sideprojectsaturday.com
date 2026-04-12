@@ -23,7 +23,6 @@ export class EventDO extends DurableObject<Env> {
     this.ctx.storage.sql.exec(`
       CREATE TABLE IF NOT EXISTS submissions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_name TEXT NOT NULL DEFAULT '',
         description TEXT NOT NULL DEFAULT '',
         participant_name TEXT NOT NULL,
         email TEXT NOT NULL,
