@@ -3,9 +3,8 @@ import Layout from "../layouts/Layout.astro";
 import { isAdmin } from "../lib/auth";
 import { getCurrentSaturday, formatEventDate } from "../lib/dates";
 import { getSubscriberCount } from "../lib/subscribers";
+import { env } from "cloudflare:workers";
 import type { EventDO } from "../do/EventDO";
-
-const env = Astro.locals.runtime.env;
 const authenticated = isAdmin(Astro.request, env.ADMIN_PASSWORD);
 
 let saturdayKey = "";
@@ -28,14 +27,14 @@ if (authenticated) {
 const message = Astro.url.searchParams.get("message");
 ---
 
-<Layout title="Admin — Side Project Saturday">
+<Layout title="Admin — Side Project Saturday" windowTitle="Admin">
   {!authenticated ? (
     <div>
-      <h1>Admin Login</h1>
+      <h1>Login</h1>
       <form method="POST" action="/api/admin/login">
-        <label for="password">Password</label>
+        <label for="password">password</label>
         <input type="password" id="password" name="password" required />
-        <button type="submit">Log in</button>
+        <button type="submit" class="btn">Log in</button>
       </form>
     </div>
   ) : (
@@ -44,36 +43,40 @@ const message = Astro.url.searchParams.get("message");
 
       {message && <div class="message success">{message}</div>}
 
-      <section style="margin-bottom: 32px;">
+      <section style="margin-bottom: 20px;">
         <h2>Next Event</h2>
-        <p><strong>{eventDate}</strong></p>
-        <p>Status: {cancelled ? "Cancelled" : "Active"}</p>
+        <p style="margin-bottom: 4px;">{eventDate}</p>
+        <p style="margin-bottom: 8px;">status: {cancelled ? "cancelled" : "active"}</p>
         <form method="POST" action="/api/admin/cancel" style="display: inline;">
           <input type="hidden" name="date" value={saturdayKey} />
-          <button type="submit">{cancelled ? "Uncancel" : "Cancel Event"}</button>
+          <button type="submit" class="btn">{cancelled ? "Uncancel" : "Cancel Event"}</button>
         </form>
       </section>
 
-      <section style="margin-bottom: 32px;">
-        <h2>Upload Event Image</h2>
+      <hr />
+
+      <section style="margin-bottom: 20px;">
+        <h2>Upload Image</h2>
         <form method="POST" action="/api/admin/upload-image" enctype="multipart/form-data">
           <input type="hidden" name="date" value={saturdayKey} />
-          <input type="file" name="image" accept="image/*" required style="margin-bottom: 8px;" />
-          <button type="submit">Upload</button>
+          <input type="file" name="image" accept="image/*" required />
+          <button type="submit" class="btn">Upload</button>
         </form>
       </section>
 
-      <section style="margin-bottom: 32px;">
+      <hr />
+
+      <section style="margin-bottom: 20px;">
         <h2>Subscribers</h2>
-        <p>Total: {subscriberCount.total} | Verified: {subscriberCount.verified}</p>
+        <p>total: {subscriberCount.total} / verified: {subscriberCount.verified}</p>
       </section>
+
+      <hr />
 
       <section>
         <h2>Links</h2>
-        <ul style="list-style: none; padding: 0;">
-          <li style="margin-bottom: 8px;"><a href={`/event/${saturdayKey}`}>Event page →</a></li>
-          <li style="margin-bottom: 8px;"><a href={`/recap/${saturdayKey}`}>Recap page →</a></li>
-        </ul>
+        <p style="margin-bottom: 4px;"><a href={`/event/${saturdayKey}`}>event page →</a></p>
+        <p style="margin-bottom: 0;"><a href={`/recap/${saturdayKey}`}>recap page →</a></p>
       </section>
     </div>
   )}

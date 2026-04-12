@@ -1,67 +1,133 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import { formatEventDate, isSubmissionOpen } from "../../lib/dates";
+import MarkdownEditor from "../../components/MarkdownEditor.astro";
+import Tip from "../../components/Tip.astro";
+import { isSubmissionOpen } from "../../lib/dates";
+import { env } from "cloudflare:workers";
 import type { EventDO } from "../../do/EventDO";
 
 const { date } = Astro.params;
 if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
   return Astro.redirect("/");
 }
-
-const env = Astro.locals.runtime.env;
 const id = env.EVENT_DO.idFromName(date);
 const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
 await stub.init(date);
 
 const cancelled = await stub.isCancelled();
 const open = isSubmissionOpen(date);
-const eventDate = formatEventDate(date);
+const eventDate = date;
 
 const message = Astro.url.searchParams.get("message");
 const error = Astro.url.searchParams.get("error");
 ---
 
-<Layout title={`${eventDate} — Side Project Saturday`}>
-  <h1>Side Project Saturday</h1>
-  <p><strong>{eventDate}</strong></p>
+<Layout
+  title={`${eventDate} — Side Project Saturday`}
+  windowTitle="Side Project Saturday"
+>
+  <p class="event-date">{eventDate}</p>
 
-  {cancelled && (
-    <div class="message error">This event has been cancelled.</div>
-  )}
+  {cancelled && <div class="message error">This event has been cancelled.</div>}
 
   {message && <div class="message success">{message}</div>}
   {error && <div class="message error">{error}</div>}
 
-  {!cancelled && open ? (
-    <div>
-      <h2>Submit Your Project</h2>
-      <p>Share what you'll be working on or demoing this Saturday.</p>
+  {
+    !cancelled && open ? (
+      <div>
+        <p>Share your work with the community.</p>
 
-      <form method="POST" action={`/api/event/${date}/submit`}>
-        <label for="project_name">Project Name *</label>
-        <input type="text" id="project_name" name="project_name" required />
+        <form method="POST" action={`/api/event/${date}/submit`}>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="participant_name">
+                name<span class="req">*</span>{" "}
+                <Tip text="Will be listed on the site, pseudonyms ok" />
+              </label>
+              <input
+                type="text"
+                id="participant_name"
+                name="participant_name"
+                required
+                autocomplete="off"
+                data-1p-ignore
+                placeholder="Sally G."
+              />
+            </div>
+            <div class="form-field">
+              <label for="email">
+                email<span class="req">*</span>{" "}
+                <Tip text="Use the same email you signed up with, not shared publicly" />
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                autocomplete="off"
+                data-1p-ignore
+                placeholder="sally@email.com"
+              />
+            </div>
+          </div>
 
-        <label for="description">Description *</label>
-        <textarea id="description" name="description" rows="3" required></textarea>
+          <MarkdownEditor
+            id="project_summary"
+            name="description"
+            label="project summary"
+          >
+            <Tip text="Shared publicly on the recap page. Leave empty to opt out. Markdown is supported." />
+          </MarkdownEditor>
 
-        <label for="participant_name">Your Name *</label>
-        <input type="text" id="participant_name" name="participant_name" required />
+          <MarkdownEditor
+            id="private_details"
+            name="private_details"
+            label="note for attendees"
+          >
+            <Tip text="Will only be shared with other attendees in the recap email. Markdown is supported." />
+          </MarkdownEditor>
 
-        <label for="email">Email * <span style="font-weight: normal; color: #666;">(links you to the participant list)</span></label>
-        <input type="email" id="email" name="email" required />
+          <button type="submit" class="btn" style="margin-top: 6px;">
+            Submit
+          </button>
+        </form>
+      </div>
+    ) : !cancelled ? (
+      <p>Submissions for this event are closed.</p>
+    ) : null
+  }
 
-        <label for="contact_info">Contact Info / Blurb <span style="font-weight: normal; color: #666;">(shared with participants)</span></label>
-        <input type="text" id="contact_info" name="contact_info" />
-
-        <label for="private_details">Private Details <span style="font-weight: normal; color: #666;">(participants only)</span></label>
-        <textarea id="private_details" name="private_details" rows="2"></textarea>
-
-        <button type="submit" style="margin-top: 8px;">Submit Project</button>
-      </form>
-    </div>
-  ) : !cancelled ? (
-    <p>Submissions for this event are closed.</p>
-  ) : null}
-
-  <p style="margin-top: 32px;"><a href="/">← Back home</a></p>
+  <a href="/" class="back-link">← back</a>
 </Layout>
+
+<style>
+  .req {
+    color: #999;
+  }
+
+  .event-date {
+    text-align: center;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+    margin: -8px 0 12px;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .form-field {
+    flex: 1;
+  }
+
+  @media (max-width: 480px) {
+    .form-row {
+      flex-direction: column;
+      gap: 0;
+    }
+  }
+</style>

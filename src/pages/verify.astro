@@ -1,28 +1,29 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { env } from "cloudflare:workers";
 import { verifySubscriber } from "../lib/subscribers";
 
 const token = Astro.url.searchParams.get("token");
 let success = false;
 
 if (token) {
-  const db = Astro.locals.runtime.env.DB;
+  const db = env.DB;
   success = await verifySubscriber(db, token);
 }
 ---
 
-<Layout title="Verify Email — Side Project Saturday">
+<Layout title="Verify Email — Side Project Saturday" windowTitle="Verify Email">
   {success ? (
     <div>
-      <h1>You're in!</h1>
-      <p>Your email has been verified. You'll get weekly updates about Side Project Saturday.</p>
-      <a href="/">← Back home</a>
+      <h1>You're in.</h1>
+      <p>Email verified. You'll get weekly updates about Side Project Saturday.</p>
+      <a href="/" class="back-link">← back</a>
     </div>
   ) : (
     <div>
-      <h1>Invalid or expired link</h1>
-      <p>This verification link is no longer valid. Try subscribing again.</p>
-      <a href="/">← Back home</a>
+      <h1>Bad link</h1>
+      <p>This verification link is invalid or expired. Try subscribing again.</p>
+      <a href="/" class="back-link">← back</a>
     </div>
   )}
 </Layout>

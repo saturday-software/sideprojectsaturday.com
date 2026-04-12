@@ -1,22 +1,86 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { getCurrentSaturday, getNextSaturday } from "../lib/dates";
+import { env } from "cloudflare:workers";
+import type { EventDO } from "../do/EventDO";
 
 const message = Astro.url.searchParams.get("message");
 const error = Astro.url.searchParams.get("error");
+
+// Find the next non-cancelled Saturday
+let nextSaturday = getCurrentSaturday();
+let cancelled = true;
+for (let i = 0; i < 4; i++) {
+  const id = env.EVENT_DO.idFromName(nextSaturday);
+  const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+  await stub.init(nextSaturday);
+  cancelled = await stub.isCancelled();
+  if (!cancelled) break;
+  nextSaturday = getNextSaturday(nextSaturday);
+}
+
+// Compute relative label
+let nextEventLabel = "";
+if (!cancelled) {
+  const now = new Date();
+  const todayNY = now.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  const [ty, tm, td] = todayNY.split("-").map(Number);
+  const [ey, em, ed] = nextSaturday.split("-").map(Number);
+  const todayMs = new Date(ty, tm - 1, td).getTime();
+  const eventMs = new Date(ey, em - 1, ed).getTime();
+  const daysUntil = Math.round((eventMs - todayMs) / 86400000);
+
+  const hourNY = parseInt(now.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }), 10);
+
+  if (daysUntil <= 0 && hourNY < 9) {
+    nextEventLabel = "Happening today";
+  } else if (daysUntil <= 0 && hourNY < 12) {
+    nextEventLabel = "Happening now";
+  } else if (daysUntil <= 0) {
+    // Saturday afternoon — show next week
+    nextEventLabel = "Next Saturday";
+  } else if (daysUntil === 1) {
+    nextEventLabel = "Happening tomorrow";
+  } else {
+    nextEventLabel = `In ${daysUntil} days`;
+  }
+}
 ---
 
-<Layout>
-  <h1>Side Project Saturday</h1>
-  <p>A small, local weekly meetup to focus on side projects and share demos.</p>
+<Layout windowTitle="Side Project Saturday" subtitle={nextEventLabel || undefined}>
+  <p>
+    Every Saturday, a handful of us get together in Brooklyn to hack on whatever
+    we want. Side projects, weird experiments, half-baked ideas, whatever you
+    want. At the end, we'll share what we were working on.
+  </p>
 
   {message && <div class="message success">{message}</div>}
   {error && <div class="message error">{error}</div>}
 
-  <form method="POST" action="/api/subscribe" style="margin-top: 24px;">
-    <label for="email">Get weekly updates</label>
-    <div style="display: flex; gap: 8px;">
-      <input type="email" id="email" name="email" placeholder="your@email.com" required />
-      <button type="submit">Subscribe</button>
+  <form
+    method="POST"
+    action="/api/subscribe"
+    class="modeless-dialog"
+    style="border: none; padding: 0;"
+  >
+    <div class="field-row" style="margin-bottom: 6px;">
+      <label for="email" style="margin-bottom: 0; white-space: nowrap;"
+        >Join us</label
+      >
+    </div>
+    <div
+      class="field-row"
+      style="display: flex; gap: 6px; align-items: flex-start;"
+    >
+      <input
+        type="email"
+        id="email"
+        name="email"
+        placeholder="you@email.com"
+        required
+        style="margin-bottom: 0; flex: 1;"
+      />
+      <button type="submit" class="btn btn-default">Subscribe</button>
     </div>
   </form>
 </Layout>
