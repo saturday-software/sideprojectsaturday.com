@@ -3,6 +3,7 @@ import { z } from "astro/zod";
 import { env } from "cloudflare:workers";
 import { requireAdmin } from "@/lib/auth";
 import { isEventCancelled, setEventCancelled } from "@/lib/events";
+import { addRule, deleteRule, toggleRule, toggleEventOnly } from "@/lib/door";
 
 export const admin = {
   login: defineAction({
@@ -39,6 +40,66 @@ export const admin = {
       await setEventCancelled(env.DB, date, !cancelled);
 
       return { message: `Event ${cancelled ? "uncancelled" : "cancelled"}` };
+    },
+  }),
+
+  addDoorRule: defineAction({
+    accept: "form",
+    input: z.object({
+      day: z.coerce.number().int().min(0).max(6),
+      start_hour: z.coerce.number().int().min(0).max(23),
+      start_minute: z.coerce.number().int().min(0).max(59),
+      end_hour: z.coerce.number().int().min(0).max(23),
+      end_minute: z.coerce.number().int().min(0).max(59),
+      event_only: z.coerce.boolean().optional().default(false),
+    }),
+    handler: async ({ day, start_hour, start_minute, end_hour, end_minute, event_only }, context) => {
+      requireAdmin(context.cookies);
+
+      const startTotal = start_hour * 60 + start_minute;
+      const endTotal = end_hour * 60 + end_minute;
+      if (endTotal <= startTotal) {
+        throw new ActionError({ code: "BAD_REQUEST", message: "End time must be after start time" });
+      }
+
+      await addRule(env.DB, day, start_hour, start_minute, end_hour, end_minute, event_only);
+      return { message: "Door rule added" };
+    },
+  }),
+
+  deleteDoorRule: defineAction({
+    accept: "form",
+    input: z.object({
+      id: z.coerce.number().int(),
+    }),
+    handler: async ({ id }, context) => {
+      requireAdmin(context.cookies);
+      await deleteRule(env.DB, id);
+      return { message: "Door rule deleted" };
+    },
+  }),
+
+  toggleDoorRule: defineAction({
+    accept: "form",
+    input: z.object({
+      id: z.coerce.number().int(),
+    }),
+    handler: async ({ id }, context) => {
+      requireAdmin(context.cookies);
+      await toggleRule(env.DB, id);
+      return { message: "Door rule toggled" };
+    },
+  }),
+
+  toggleDoorRuleEventOnly: defineAction({
+    accept: "form",
+    input: z.object({
+      id: z.coerce.number().int(),
+    }),
+    handler: async ({ id }, context) => {
+      requireAdmin(context.cookies);
+      await toggleEventOnly(env.DB, id);
+      return { message: "Door rule updated" };
     },
   }),
 };
