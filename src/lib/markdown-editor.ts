@@ -272,8 +272,6 @@ function handleImageInsert(view: EditorView, files: File[], pos?: number) {
     view.dispatch({ changes: { from: insertPos, insert: placeholder } });
 
     const placeholderFrom = insertPos;
-    const placeholderTo = insertPos + placeholder.length;
-
     uploadImage(file).then((imageUrl) => {
       // Find and replace the placeholder
       const doc = view.state.doc.toString();
@@ -321,7 +319,7 @@ const imageDropPaste = EditorView.domEventHandlers({
     }
     return false;
   },
-  dragleave(event, view) {
+  dragleave(_event, view) {
     view.dom.classList.remove('cm-drag-over');
     return false;
   },

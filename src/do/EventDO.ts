@@ -136,7 +136,13 @@ export class EventDO extends DurableObject<Env> {
       .toArray()[0] as { event_date: string } | undefined;
     if (!row) return false;
 
-    const saturday = new Date(row.event_date + "T00:00:00Z");
+    // event_date is stored as YYMMDD slug
+    const slug = row.event_date;
+    const yy = slug.slice(0, 2);
+    const mm = slug.slice(2, 4);
+    const dd = slug.slice(4, 6);
+    const year = parseInt(yy, 10) >= 70 ? `19${yy}` : `20${yy}`;
+    const saturday = new Date(`${year}-${mm}-${dd}T00:00:00Z`);
     const deadline = new Date(saturday);
     deadline.setUTCDate(deadline.getUTCDate() + 2);
     deadline.setUTCHours(4, 0, 0, 0);

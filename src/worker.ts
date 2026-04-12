@@ -10,11 +10,11 @@ import {
   fridayReminder,
   sundayRecap,
 } from "./email/templates";
-import { getCurrentSaturday, getPreviousSaturday } from "./lib/dates";
+import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
 import { getVerifiedSubscribers, getParticipants } from "./lib/subscribers";
 
-function getEventDO(env: Env, dateKey: string) {
-  const id = env.EVENT_DO.idFromName(dateKey);
+function getEventDO(env: Env, slug: string) {
+  const id = env.EVENT_DO.idFromName(slug);
   return env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
 }
 
@@ -26,35 +26,38 @@ export default {
   async scheduled(
     controller: ScheduledController,
     env: Env,
-    ctx: ExecutionContext
+    _ctx: ExecutionContext
   ): Promise<void> {
     const cron = controller.cron;
     const now = new Date();
     const saturdayKey = getCurrentSaturday(now);
+    const saturdaySlug = dateKeyToSlug(saturdayKey);
 
     if (cron === "0 13 * * 3") {
       // Wednesday: announcement or cancellation
-      const stub = getEventDO(env, saturdayKey);
-      await stub.init(saturdayKey);
+      const stub = getEventDO(env, saturdaySlug);
+      await stub.init(saturdaySlug);
       const cancelled = await stub.isCancelled();
 
       const lastWeekKey = getPreviousSaturday(saturdayKey);
-      const lastWeekStub = getEventDO(env, lastWeekKey);
+      const lastWeekSlug = dateKeyToSlug(lastWeekKey);
+      const lastWeekStub = getEventDO(env, lastWeekSlug);
       const lastWeekSubmissions = await lastWeekStub.getPublicSubmissions();
 
       const subscribers = await getVerifiedSubscribers(env.DB);
 
-      for (const sub of subscribers) {
-        const template = cancelled
-          ? wednesdayCancellation(saturdayKey, env.SITE_URL)
-          : wednesdayAnnouncement(
-              saturdayKey,
-              env.EVENT_ADDRESS,
-              env.SITE_URL,
-              lastWeekSubmissions,
-              lastWeekKey
-            );
+      const template = cancelled
+        ? wednesdayCancellation(saturdayKey, env.SITE_URL)
+        : await wednesdayAnnouncement(
+            saturdayKey,
+            env.EVENT_ADDRESS,
+            env.SITE_URL,
+            lastWeekSubmissions,
+            lastWeekKey,
+            env.SHARE_SEED
+          );
 
+      for (const sub of subscribers) {
         const html = template.html.replace("%%EMAIL%%", encodeURIComponent(sub.email));
         await sendEmail(env.EMAIL, {
           to: sub.email,
@@ -65,13 +68,13 @@ export default {
       }
     } else if (cron === "0 13 * * 5") {
       // Friday: reminder (if not cancelled)
-      const stub = getEventDO(env, saturdayKey);
-      await stub.init(saturdayKey);
+      const stub = getEventDO(env, saturdaySlug);
+      await stub.init(saturdaySlug);
       const cancelled = await stub.isCancelled();
       if (cancelled) return;
 
       const subscribers = await getVerifiedSubscribers(env.DB);
-      const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
+      const template = await fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL, env.SHARE_SEED);
 
       for (const sub of subscribers) {
         const html = template.html.replace("%%EMAIL%%", encodeURIComponent(sub.email));
@@ -94,8 +97,9 @@ export default {
         }
         return saturdayKey;
       })();
+      const recapSlug = dateKeyToSlug(recapKey);
 
-      const stub = getEventDO(env, recapKey);
+      const stub = getEventDO(env, recapSlug);
       const submissions = await stub.getSubmissions();
       const imageKey = await stub.getImageKey();
 
