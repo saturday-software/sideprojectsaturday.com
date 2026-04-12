@@ -1,11 +1,11 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { actions } from "astro:actions";
 import MarkdownEditor from "@/components/MarkdownEditor.astro";
 import Tip from "@/components/Tip.astro";
 import { resolveShareCode } from "@/lib/share";
-import { dateKeyToSlug } from "@/lib/dates";
+import { ensureEvent, isEventCancelled } from "@/lib/events";
 import { env } from "cloudflare:workers";
-import type { EventDO } from "@/do/EventDO";
 
 const { code } = Astro.params;
 if (!code) {
@@ -17,16 +17,15 @@ if (!date) {
   return Astro.redirect("/");
 }
 
-const slug = dateKeyToSlug(date);
-const id = env.EVENT_DO.idFromName(slug);
-const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-await stub.init(slug);
-
-const cancelled = await stub.isCancelled();
+await ensureEvent(env.DB, date);
+const cancelled = await isEventCancelled(env.DB, date);
 const eventDate = date;
 
-const message = Astro.url.searchParams.get("message");
-const error = Astro.url.searchParams.get("error");
+const result = Astro.getActionResult(actions.events.submit);
+if (result?.data) {
+  return Astro.redirect(`/events/${result.data.slug}`);
+}
+const error = result?.error?.message;
 ---
 
 <Layout
@@ -37,7 +36,6 @@ const error = Astro.url.searchParams.get("error");
 
   {cancelled && <div class="message error">This event has been cancelled.</div>}
 
-  {message && <div class="message success">{message}</div>}
   {error && <div class="message error">{error}</div>}
 
   {
@@ -45,7 +43,8 @@ const error = Astro.url.searchParams.get("error");
       <div>
         <p>Share your work with the community.</p>
 
-        <form method="POST" action={`/api/events/${dateKeyToSlug(date)}/submit`}>
+        <form method="POST" action={actions.events.submit}>
+          <input type="hidden" name="date" value={date} />
           <input type="hidden" name="share_code" value={code} />
           <div class="form-row">
             <div class="form-field">

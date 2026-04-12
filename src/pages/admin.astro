@@ -1,12 +1,23 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { actions } from "astro:actions";
 import { isAdmin } from "@/lib/auth";
 import { getUpcomingSaturdays, dateKeyToSlug } from "@/lib/dates";
+import { ensureEvent, isEventCancelled } from "@/lib/events";
 import { generateShareCode } from "@/lib/share";
 import { getSubscriberCount } from "@/lib/subscribers";
 import { env } from "cloudflare:workers";
-import type { EventDO } from "@/do/EventDO";
+
+const loginResult = Astro.getActionResult(actions.admin.login);
+if (loginResult && !loginResult.error) {
+  return Astro.redirect("/admin");
+}
+
 const authenticated = isAdmin(Astro.request);
+
+const cancelResult = Astro.getActionResult(actions.admin.cancel);
+const message = cancelResult?.data?.message;
+const error = loginResult?.error?.message || cancelResult?.error?.message;
 
 const WEEKS_AHEAD = 4;
 
@@ -18,26 +29,22 @@ if (authenticated) {
   const saturdays = getUpcomingSaturdays(WEEKS_AHEAD);
 
   for (const date of saturdays) {
-    const slug = dateKeyToSlug(date);
-    const id = env.EVENT_DO.idFromName(slug);
-    const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-    await stub.init(slug);
-    events.push({ date, cancelled: await stub.isCancelled() });
+    await ensureEvent(env.DB, date);
+    const cancelled = await isEventCancelled(env.DB, date);
+    events.push({ date, cancelled });
   }
 
   const nextActive = events.find((e) => !e.cancelled)?.date ?? saturdays[0];
   shareCode = await generateShareCode(env.SHARE_SEED, nextActive);
   subscriberCount = await getSubscriberCount(env.DB);
 }
-
-const message = Astro.url.searchParams.get("message");
 ---
 
 <Layout title="Admin — Side Project Saturday" windowTitle="Admin">
   {!authenticated ? (
     <div>
       <h1>Login</h1>
-      <form method="POST" action="/api/admin/login">
+      <form method="POST" action={actions.admin.login}>
         <label for="password">password</label>
         <input type="password" id="password" name="password" required />
         <button type="submit" class="btn">Log in</button>
@@ -48,12 +55,13 @@ const message = Astro.url.searchParams.get("message");
       <h1>Admin</h1>
 
       {message && <div class="message success">{message}</div>}
+      {error && <div class="message error">{error}</div>}
 
       <section style="margin-bottom: 20px;">
         <h2>Upcoming Events</h2>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           {events.map((event) => (
-            <form method="POST" action="/api/admin/cancel">
+            <form method="POST" action={actions.admin.cancel}>
               <input type="hidden" name="date" value={event.date} />
               <button
                 type="submit"
@@ -65,17 +73,6 @@ const message = Astro.url.searchParams.get("message");
             </form>
           ))}
         </div>
-      </section>
-
-      <hr />
-
-      <section style="margin-bottom: 20px;">
-        <h2>Add event image</h2>
-        <form method="POST" action="/api/admin/upload-image" enctype="multipart/form-data">
-          <input type="hidden" name="date" value={events[0]?.date} />
-          <input type="file" name="image" accept="image/*" required />
-          <button type="submit" class="btn">Upload</button>
-        </form>
       </section>
 
       <hr />

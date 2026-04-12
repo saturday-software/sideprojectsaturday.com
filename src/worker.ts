@@ -11,6 +11,7 @@ import {
   sundayRecap,
 } from "./email/templates";
 import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
+import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
 import { getVerifiedSubscribers, getParticipants } from "./lib/subscribers";
 
 function getEventDO(env: Env, slug: string) {
@@ -31,13 +32,10 @@ export default {
     const cron = controller.cron;
     const now = new Date();
     const saturdayKey = getCurrentSaturday(now);
-    const saturdaySlug = dateKeyToSlug(saturdayKey);
-
     if (cron === "0 13 * * 3") {
       // Wednesday: announcement or cancellation
-      const stub = getEventDO(env, saturdaySlug);
-      await stub.init(saturdaySlug);
-      const cancelled = await stub.isCancelled();
+      await ensureEvent(env.DB, saturdayKey);
+      const cancelled = await isEventCancelled(env.DB, saturdayKey);
 
       const lastWeekKey = getPreviousSaturday(saturdayKey);
       const lastWeekSlug = dateKeyToSlug(lastWeekKey);
@@ -68,9 +66,8 @@ export default {
       }
     } else if (cron === "0 13 * * 5") {
       // Friday: reminder (if not cancelled)
-      const stub = getEventDO(env, saturdaySlug);
-      await stub.init(saturdaySlug);
-      const cancelled = await stub.isCancelled();
+      await ensureEvent(env.DB, saturdayKey);
+      const cancelled = await isEventCancelled(env.DB, saturdayKey);
       if (cancelled) return;
 
       const subscribers = await getVerifiedSubscribers(env.DB);
@@ -101,10 +98,11 @@ export default {
 
       const stub = getEventDO(env, recapSlug);
       const submissions = await stub.getSubmissions();
-      const imageKey = await stub.getImageKey();
+      const imageKey = eventImageKey(recapSlug);
+      const hasImage = await env.IMAGES_BUCKET.head(imageKey) !== null;
 
       const participants = await getParticipants(env.DB);
-      const template = sundayRecap(recapKey, submissions, imageKey, env.SITE_URL);
+      const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
 
       for (const sub of participants) {
         const html = template.html.replace("%%EMAIL%%", encodeURIComponent(sub.email));

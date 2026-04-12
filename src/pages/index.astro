@@ -1,21 +1,20 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import { getCurrentSaturday, getNextSaturday, dateKeyToSlug } from "@/lib/dates";
+import { actions } from "astro:actions";
+import { getCurrentSaturday, getNextSaturday } from "@/lib/dates";
+import { ensureEvent, isEventCancelled } from "@/lib/events";
 import { env } from "cloudflare:workers";
-import type { EventDO } from "@/do/EventDO";
 
-const message = Astro.url.searchParams.get("message");
-const error = Astro.url.searchParams.get("error");
+const result = Astro.getActionResult(actions.subscribe);
+const message = result?.data?.message;
+const error = result?.error?.message;
 
 // Find the next non-cancelled Saturday
 let nextSaturday = getCurrentSaturday();
 let cancelled = true;
 for (let i = 0; i < 4; i++) {
-  const slug = dateKeyToSlug(nextSaturday);
-  const id = env.EVENT_DO.idFromName(slug);
-  const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-  await stub.init(slug);
-  cancelled = await stub.isCancelled();
+  await ensureEvent(env.DB, nextSaturday);
+  cancelled = await isEventCancelled(env.DB, nextSaturday);
   if (!cancelled) break;
   nextSaturday = getNextSaturday(nextSaturday);
 }
@@ -50,9 +49,9 @@ if (!cancelled) {
 
 <Layout windowTitle="Side Project Saturday" subtitle={nextEventLabel || undefined}>
   <p>
-    Every Saturday, a handful of us get together in Brooklyn to hack on whatever
-    we want. Side projects, weird experiments, half-baked ideas, whatever you
-    want. At the end, we'll share what we were working on.
+    Every Saturday, a handful of us get together in Brooklyn to hack on
+    whatever we want — side projects, weird experiments, half-baked ideas.
+    At the end, we share what we were working on.
   </p>
 
   {message && <div class="message success">{message}</div>}
@@ -60,7 +59,7 @@ if (!cancelled) {
 
   <form
     method="POST"
-    action="/api/subscribe"
+    action={actions.subscribe}
     class="modeless-dialog"
     style="border: none; padding: 0;"
   >
