@@ -4,6 +4,7 @@ import { env } from "cloudflare:workers";
 import { requireAdmin } from "@/lib/auth";
 import { isEventCancelled, setEventCancelled } from "@/lib/events";
 import { addRule, deleteRule, toggleRule, toggleEventOnly } from "@/lib/door";
+import { switchbotPress } from "@/lib/switchbot";
 
 export const admin = {
   login: defineAction({
@@ -100,6 +101,15 @@ export const admin = {
       requireAdmin(context.cookies);
       await toggleEventOnly(env.DB, id);
       return { message: "Door rule updated" };
+    },
+  }),
+
+  openDoor: defineAction({
+    accept: "form",
+    handler: async (_input, context) => {
+      requireAdmin(context.cookies);
+      await switchbotPress(env.SWITCHBOT_DEVICE_ID, env.SWITCHBOT_TOKEN, env.SWITCHBOT_KEY);
+      return { message: "Door opened!" };
     },
   }),
 };

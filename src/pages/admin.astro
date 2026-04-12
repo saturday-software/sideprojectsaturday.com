@@ -20,8 +20,9 @@ const cancelResult = Astro.getActionResult(actions.admin.cancel);
 const doorResult = Astro.getActionResult(actions.admin.addDoorRule)
   ?? Astro.getActionResult(actions.admin.deleteDoorRule)
   ?? Astro.getActionResult(actions.admin.toggleDoorRule);
-const message = cancelResult?.data?.message ?? doorResult?.data?.message;
-const error = loginResult?.error?.message ?? cancelResult?.error?.message ?? doorResult?.error?.message;
+const openDoorResult = Astro.getActionResult(actions.admin.openDoor);
+const message = cancelResult?.data?.message ?? doorResult?.data?.message ?? openDoorResult?.data?.message;
+const error = loginResult?.error?.message ?? cancelResult?.error?.message ?? doorResult?.error?.message ?? openDoorResult?.error?.message;
 
 const WEEKS_AHEAD = 4;
 
@@ -92,6 +93,9 @@ if (authenticated) {
 
       <section style="margin-bottom: 20px;">
         <h2>Door Rules</h2>
+        <form method="POST" action={actions.admin.openDoor} style="margin-bottom: 12px;">
+          <button type="submit" class="btn btn-open-door">Open Door</button>
+        </form>
         <p style="font-size: 12px; margin-bottom: 8px; color: #666;">
           The door buzzer is active when current time matches any enabled rule.
         </p>
@@ -303,6 +307,18 @@ if (authenticated) {
 
   .checkbox-label label {
     margin-left: 16px;
+  }
+
+  .btn-open-door {
+    background: #0a0;
+    color: #fff;
+    border-color: #0a0;
+    padding: 8px 16px;
+  }
+
+  .btn-open-door:hover {
+    background: #0c0;
+    border-color: #0c0;
   }
 
   .checkbox-label label::before {
