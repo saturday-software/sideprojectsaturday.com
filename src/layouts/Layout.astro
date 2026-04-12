@@ -63,11 +63,13 @@ const { title = "Side Project Saturday", windowTitle = "Side Project Saturday", 
 
   body {
     font-family: "Departure Mono", monospace;
-    min-height: 100vh;
+    height: 100dvh;
+    margin: 0;
     display: flex;
     justify-content: center;
     align-items: flex-start;
     padding: 48px 16px;
+    overflow: hidden;
   }
 
   main {
@@ -257,6 +259,9 @@ const { title = "Side Project Saturday", windowTitle = "Side Project Saturday", 
     margin: 0;
     color: #666;
     min-width: 0;
+    background: #fff;
+    padding: 2px 6px;
+    border-radius: 2px;
   }
 
   @media (max-width: 480px) {
