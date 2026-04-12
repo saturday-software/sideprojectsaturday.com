@@ -14,7 +14,11 @@
   },
   "dependencies": {
     "@astrojs/cloudflare": "^13.1.8",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/language-data": "^6.5.2",
     "astro": "^6.1.5",
+    "codemirror": "^6.0.2",
     "mimetext": "^3.0.28"
   },
   "devDependencies": {
