@@ -1,0 +1,47 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { resolveShareCode } from "@/lib/share";
+import { renderSVG } from "uqr";
+import { env } from "cloudflare:workers";
+
+const { code } = Astro.params;
+if (!code) {
+  return Astro.redirect("/");
+}
+
+const date = await resolveShareCode(env.SHARE_SEED, code);
+if (!date) {
+  return Astro.redirect("/");
+}
+
+const shareUrl = `${env.SITE_URL}/share/${code}`;
+const svg = renderSVG(shareUrl);
+---
+
+<Layout title="Share QR Code — Side Project Saturday" windowTitle="Side Project Saturday">
+  <div class="qr-container">
+    <h1>Share</h1>
+    <div class="qr" set:html={svg} />
+    <p class="url">{shareUrl}</p>
+  </div>
+  <a href="/" class="back-link">← back</a>
+</Layout>
+
+<style>
+  .qr-container {
+    text-align: center;
+  }
+
+  .qr :global(svg) {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+  }
+
+  .url {
+    font-size: 11px;
+    color: #666;
+    word-break: break-all;
+    margin-top: 12px;
+  }
+</style>

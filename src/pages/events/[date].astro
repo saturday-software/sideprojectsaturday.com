@@ -1,0 +1,57 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { formatEventDate, slugToDateKey } from "@/lib/dates";
+import { renderMarkdown } from "@/lib/render-markdown";
+import { env } from "cloudflare:workers";
+import type { EventDO } from "@/do/EventDO";
+
+const { date: slug } = Astro.params;
+if (!slug || !/^\d{6}$/.test(slug)) {
+  return Astro.redirect("/");
+}
+const date = slugToDateKey(slug);
+const id = env.EVENT_DO.idFromName(slug);
+const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+
+const submissions = await stub.getPublicSubmissions();
+const imageKey = await stub.getImageKey();
+const eventDate = formatEventDate(date);
+---
+
+<Layout title={`Event: ${eventDate} — Side Project Saturday`} windowTitle="Side Project Saturday">
+  <h1>Event</h1>
+  <p>{eventDate}</p>
+
+  {imageKey && (
+    <img
+      src={`/api/image/${imageKey}`}
+      alt="Event photo"
+      style="width: 100%; border: 1px solid #000; margin-bottom: 16px;"
+    />
+  )}
+
+  {submissions.length > 0 ? (
+    <div>
+      {submissions.map((s) => (
+        <div class="project-card">
+          <h2 style="text-transform: none; letter-spacing: normal;">{s.project_name}</h2>
+          <p style="margin-bottom: 4px; color: #666; font-size: 11px;">by {s.participant_name}</p>
+          <p style="margin-bottom: 0;" set:html={renderMarkdown(s.description)} />
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p>No projects were submitted for this event.</p>
+  )}
+
+  <a href="/" class="back-link">← back</a>
+</Layout>
+
+<style>
+  .project-card {
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid #000;
+    background: #fff;
+  }
+</style>

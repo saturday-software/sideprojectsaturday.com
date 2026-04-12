@@ -1,0 +1,139 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import MarkdownEditor from "@/components/MarkdownEditor.astro";
+import Tip from "@/components/Tip.astro";
+import { resolveShareCode } from "@/lib/share";
+import { dateKeyToSlug } from "@/lib/dates";
+import { env } from "cloudflare:workers";
+import type { EventDO } from "@/do/EventDO";
+
+const { code } = Astro.params;
+if (!code) {
+  return Astro.redirect("/");
+}
+
+const date = await resolveShareCode(env.SHARE_SEED, code);
+if (!date) {
+  return Astro.redirect("/");
+}
+
+const slug = dateKeyToSlug(date);
+const id = env.EVENT_DO.idFromName(slug);
+const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+await stub.init(slug);
+
+const cancelled = await stub.isCancelled();
+const eventDate = date;
+
+const message = Astro.url.searchParams.get("message");
+const error = Astro.url.searchParams.get("error");
+---
+
+<Layout
+  title={`${eventDate} — Side Project Saturday`}
+  windowTitle="Side Project Saturday"
+>
+  <p class="event-date">{eventDate}</p>
+
+  {cancelled && <div class="message error">This event has been cancelled.</div>}
+
+  {message && <div class="message success">{message}</div>}
+  {error && <div class="message error">{error}</div>}
+
+  {
+    !cancelled ? (
+      <div>
+        <p>Share your work with the community.</p>
+
+        <form method="POST" action={`/api/events/${dateKeyToSlug(date)}/submit`}>
+          <input type="hidden" name="share_code" value={code} />
+          <div class="form-row">
+            <div class="form-field">
+              <label for="participant_name">
+                name<span class="req">*</span>{" "}
+                <Tip text="Will be listed on the site, pseudonyms ok" />
+              </label>
+              <input
+                type="text"
+                id="participant_name"
+                name="participant_name"
+                required
+                autocomplete="off"
+                data-1p-ignore
+                placeholder="Sally G."
+              />
+            </div>
+            <div class="form-field">
+              <label for="email">
+                email<span class="req">*</span>{" "}
+                <Tip text="Use the same email you signed up with, not shared publicly" />
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                autocomplete="off"
+                data-1p-ignore
+                placeholder="sally@email.com"
+              />
+            </div>
+          </div>
+
+          <MarkdownEditor
+            id="project_summary"
+            name="description"
+            label="project summary"
+          >
+            <Tip text="Shared publicly on the event page. Leave empty to opt out. Markdown is supported." />
+          </MarkdownEditor>
+
+          <MarkdownEditor
+            id="private_details"
+            name="private_details"
+            label="note for attendees"
+          >
+            <Tip text="Will only be shared with other attendees in the recap email. Markdown is supported." />
+          </MarkdownEditor>
+
+          <button type="submit" class="btn" style="margin-top: 6px;">
+            Submit
+          </button>
+        </form>
+      </div>
+    ) : null
+  }
+
+  <a href="/" class="back-link">← back</a>
+</Layout>
+
+<style>
+  .req {
+    color: #999;
+  }
+
+  .event-date {
+    text-align: center;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+    margin: -8px 0 12px;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .form-field {
+    flex: 1;
+  }
+
+  @media (max-width: 480px) {
+    .form-row {
+      flex-direction: column;
+      gap: 0;
+    }
+  }
+</style>
