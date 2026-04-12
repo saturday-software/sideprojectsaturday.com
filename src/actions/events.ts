@@ -55,6 +55,7 @@ export const events = {
 
       await env.IMAGES_BUCKET.put(key, image.stream(), {
         httpMetadata: { contentType: image.type },
+        customMetadata: { source: `event:${slug}` },
       });
 
       return { message: "Image uploaded" };

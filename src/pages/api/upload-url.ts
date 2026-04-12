@@ -31,8 +31,11 @@ export const POST: APIRoute = async ({ request }) => {
   const ext = ALLOWED_TYPES[contentType];
   const key = `submissions/${crypto.randomUUID()}.${ext}`;
 
+  const source = request.headers.get("x-upload-source") || "unknown";
+
   await env.IMAGES_BUCKET.put(key, request.body, {
     httpMetadata: { contentType },
+    customMetadata: { source },
   });
 
   return new Response(
