@@ -5,5 +5,8 @@ declare namespace Cloudflare {
   interface Env {
     ADMIN_PASSWORD: string;
     SHARE_SEED: string;
+    SWITCHBOT_TOKEN: string;
+    SWITCHBOT_KEY: string;
+    SWITCHBOT_DEVICE_ID: string;
   }
 }

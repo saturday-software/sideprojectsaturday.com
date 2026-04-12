@@ -90,6 +90,17 @@ export function slugToDateKey(slug: string): string {
   return `${year}-${mm}-${dd}`;
 }
 
+/** Check if current time is within Saturday event hours (9am–12pm ET). */
+export function isWithinEventHours(now: Date = new Date()): boolean {
+  const { weekday } = nyParts(now);
+  if (weekday !== 6) return false;
+  const hourNY = parseInt(
+    now.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", hour12: false }),
+    10,
+  );
+  return hourNY >= 9 && hourNY < 12;
+}
+
 /** Check if submission window is open (before Sunday midnight ET for a given Saturday). */
 export function isSubmissionOpen(saturdayKey: string, now: Date = new Date()): boolean {
   // Compare current NY date to the deadline (end of Sunday)
