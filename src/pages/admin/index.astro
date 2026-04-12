@@ -1,0 +1,331 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { actions } from "astro:actions";
+import { isAdmin } from "@/lib/auth";
+import { getUpcomingSaturdays, dateKeyToSlug } from "@/lib/dates";
+import { ensureEvent, isEventCancelled } from "@/lib/events";
+import { generateShareCode } from "@/lib/share";
+import { getSubscriberCount } from "@/lib/subscribers";
+import { getRules, dayName, formatTime, type DoorRule } from "@/lib/door";
+import { env } from "cloudflare:workers";
+
+const loginResult = Astro.getActionResult(actions.admin.login);
+if (loginResult && !loginResult.error) {
+  return Astro.redirect("/admin");
+}
+
+const authenticated = isAdmin(Astro.request);
+
+const cancelResult = Astro.getActionResult(actions.admin.cancel);
+const doorResult = Astro.getActionResult(actions.admin.addDoorRule)
+  ?? Astro.getActionResult(actions.admin.deleteDoorRule)
+  ?? Astro.getActionResult(actions.admin.toggleDoorRule);
+const openDoorResult = Astro.getActionResult(actions.admin.openDoor);
+const message = cancelResult?.data?.message ?? doorResult?.data?.message ?? openDoorResult?.data?.message;
+const error = loginResult?.error?.message ?? cancelResult?.error?.message ?? doorResult?.error?.message ?? openDoorResult?.error?.message;
+
+const WEEKS_AHEAD = 4;
+
+let events: { date: string; cancelled: boolean }[] = [];
+let shareCode = "";
+let subscriberCount = { total: 0, verified: 0 };
+let doorRules: DoorRule[] = [];
+
+if (authenticated) {
+  const saturdays = getUpcomingSaturdays(WEEKS_AHEAD);
+
+  for (const date of saturdays) {
+    await ensureEvent(env.DB, date);
+    const cancelled = await isEventCancelled(env.DB, date);
+    events.push({ date, cancelled });
+  }
+
+  const nextActive = events.find((e) => !e.cancelled)?.date ?? saturdays[0];
+  shareCode = await generateShareCode(env.SHARE_SEED, nextActive);
+  subscriberCount = await getSubscriberCount(env.DB);
+  doorRules = await getRules(env.DB);
+}
+---
+
+<Layout title="Admin — Side Project Saturday" windowTitle="Admin">
+  {!authenticated ? (
+    <div>
+      <h1>Login</h1>
+      <form method="POST" action={actions.admin.login}>
+        <label for="password">password</label>
+        <input type="password" id="password" name="password" required />
+        <button type="submit" class="btn">Log in</button>
+      </form>
+    </div>
+  ) : (
+    <div>
+      <h1>Admin</h1>
+
+      {message && <div class="message success">{message}</div>}
+      {error && <div class="message error">{error}</div>}
+
+      <section style="margin-bottom: 20px;">
+        <h2>Upcoming Events</h2>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          {events.map((event) => (
+            <form method="POST" action={actions.admin.cancel}>
+              <input type="hidden" name="date" value={event.date} />
+              <button
+                type="submit"
+                class:list={["btn", "event-toggle", { cancelled: event.cancelled }]}
+                data-tip={event.cancelled ? "Uncancel" : "Cancel"}
+              >
+                {event.date}
+              </button>
+            </form>
+          ))}
+        </div>
+      </section>
+
+      <hr />
+
+      <section style="margin-bottom: 20px;">
+        <h2>Subscribers</h2>
+        <p>total: {subscriberCount.total} / verified: {subscriberCount.verified}</p>
+      </section>
+
+      <hr />
+
+      <section style="margin-bottom: 20px;">
+        <h2>Door Rules</h2>
+        <form method="POST" action={actions.admin.openDoor} style="margin-bottom: 12px;">
+          <button type="submit" class="btn btn-open-door">Open Door</button>
+        </form>
+        <p style="font-size: 12px; margin-bottom: 8px; color: #666;">
+          The door buzzer is active when current time matches any enabled rule.
+        </p>
+
+        {doorRules.length > 0 && (
+          <table class="door-rules-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Window</th>
+                <th>Event only</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {doorRules.map((rule) => (
+                <tr class:list={{ disabled: !rule.enabled }}>
+                  <td>{dayName(rule.day)}</td>
+                  <td>{formatTime(rule.start_hour, rule.start_minute)}–{formatTime(rule.end_hour, rule.end_minute)}</td>
+                  <td>{rule.event_only ? "Yes" : "No"}</td>
+                  <td class="rule-actions">
+                    <form method="POST" action={actions.admin.toggleDoorRule} style="display:inline;">
+                      <input type="hidden" name="id" value={rule.id} />
+                      <button type="submit" class="btn btn-sm">{rule.enabled ? "Disable" : "Enable"}</button>
+                    </form>
+                    <form method="POST" action={actions.admin.deleteDoorRule} style="display:inline;">
+                      <input type="hidden" name="id" value={rule.id} />
+                      <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        <details style="margin-top: 8px;">
+          <summary style="cursor: pointer; font-size: 13px;">Add rule</summary>
+          <form method="POST" action={actions.admin.addDoorRule} class="add-rule-form">
+            <div class="rule-fields">
+              <label>
+                Day
+                <select name="day">
+                  <option value="0">Sun</option>
+                  <option value="1">Mon</option>
+                  <option value="2">Tue</option>
+                  <option value="3">Wed</option>
+                  <option value="4">Thu</option>
+                  <option value="5">Fri</option>
+                  <option value="6" selected>Sat</option>
+                </select>
+              </label>
+              <label>
+                Start
+                <div style="display: flex; gap: 4px;">
+                  <input type="number" name="start_hour" min="0" max="23" value="9" style="width: 48px;" required />
+                  <span>:</span>
+                  <input type="number" name="start_minute" min="0" max="59" value="0" style="width: 48px;" required />
+                </div>
+              </label>
+              <label>
+                End
+                <div style="display: flex; gap: 4px;">
+                  <input type="number" name="end_hour" min="0" max="23" value="12" style="width: 48px;" required />
+                  <span>:</span>
+                  <input type="number" name="end_minute" min="0" max="59" value="0" style="width: 48px;" required />
+                </div>
+              </label>
+            </div>
+            <div class="checkbox-label">
+              <input type="checkbox" name="event_only" value="true" id="event_only" checked />
+              <label for="event_only">Event only <span style="color: #666; font-size: 11px;">(only when event is not cancelled)</span></label>
+            </div>
+            <button type="submit" class="btn" style="margin-top: 8px;">Add</button>
+          </form>
+        </details>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>Links</h2>
+        <p style="margin-bottom: 4px;"><a href={`/share/${shareCode}`}>share page →</a></p>
+        <p style="margin-bottom: 4px;"><a href={`/share/${shareCode}/qr`}>share QR code →</a></p>
+        <p style="margin-bottom: 4px;"><a href={`/events/${dateKeyToSlug(events[0]?.date)}`}>event page →</a></p>
+        <p style="margin-bottom: 0;"><a href="/admin/images">manage images →</a></p>
+      </section>
+    </div>
+  )}
+</Layout>
+
+<style>
+  .event-toggle {
+    position: relative;
+    padding: 6px 12px;
+    border: 2px solid #000;
+    background: #000;
+    color: #fff;
+    border-radius: 4px;
+  }
+
+  .event-toggle:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 8px;
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  .event-toggle:hover {
+    background: #ff0;
+    color: #000;
+  }
+
+  .event-toggle:active {
+    background: #f00;
+    color: #fff;
+  }
+
+  .event-toggle.cancelled {
+    background: #fff;
+    color: #000;
+    text-decoration: line-through;
+  }
+
+  .event-toggle.cancelled:hover {
+    background: #ff0;
+    color: #000;
+  }
+
+  .event-toggle.cancelled:active {
+    background: #0a0;
+    color: #fff;
+  }
+
+  .door-rules-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .door-rules-table th,
+  .door-rules-table td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .door-rules-table th {
+    font-weight: bold;
+    border-bottom: 2px solid #000;
+  }
+
+  .door-rules-table tr.disabled td {
+    color: #999;
+    text-decoration: line-through;
+  }
+
+  .rule-actions {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  .btn-sm {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  .btn-danger:hover {
+    background: #f00;
+    color: #fff;
+  }
+
+  .add-rule-form {
+    margin-top: 8px;
+  }
+
+  .rule-fields {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .rule-fields label {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .rule-fields select,
+  .rule-fields input[type="number"] {
+    font-size: 13px;
+    padding: 4px 6px;
+  }
+
+  .checkbox-label {
+    margin-top: 8px;
+    font-size: 13px;
+  }
+
+  .checkbox-label label {
+    margin-left: 16px;
+  }
+
+  .btn-open-door {
+    padding: 4px 12px;
+  }
+
+  .checkbox-label label::before {
+    height: 10px !important;
+    width: 10px !important;
+    left: -14px !important;
+    margin-left: -2px;
+  }
+
+  .checkbox-label input[type="checkbox"]:checked + label::after {
+    height: 11px !important;
+    width: 11px !important;
+    left: -15px !important;
+    top: 1px !important;
+    background-size: contain !important;
+  }
+</style>

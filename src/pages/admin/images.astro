@@ -1,0 +1,242 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { isAdmin } from "@/lib/auth";
+
+const authenticated = isAdmin(Astro.request);
+if (!authenticated) {
+  return Astro.redirect("/admin");
+}
+---
+
+<Layout title="Images — Admin" windowTitle="Images">
+  <div>
+    <p style="margin-bottom: 12px;"><a href="/admin">← back to admin</a></p>
+    <h1>Images</h1>
+
+    <section style="margin-bottom: 20px;">
+      <h2>Upload</h2>
+      <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/gif" />
+      <button class="btn" id="upload-btn" disabled>Upload</button>
+      <span id="upload-status" style="font-size: 12px; margin-left: 8px;"></span>
+    </section>
+
+    <hr />
+
+    <section>
+      <h2>All Images</h2>
+      <p id="loading" style="color: #666;">Loading…</p>
+      <div id="image-list"></div>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  const list = document.getElementById("image-list")!;
+  const loading = document.getElementById("loading")!;
+  const fileInput = document.getElementById("file-input") as HTMLInputElement;
+  const uploadBtn = document.getElementById("upload-btn") as HTMLButtonElement;
+  const uploadStatus = document.getElementById("upload-status")!;
+
+  fileInput.addEventListener("change", () => {
+    uploadBtn.disabled = !fileInput.files?.length;
+  });
+
+  uploadBtn.addEventListener("click", async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+
+    uploadBtn.disabled = true;
+    uploadStatus.textContent = "Uploading…";
+
+    try {
+      const res = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": file.type, "X-Upload-Source": "admin" },
+        body: file,
+      });
+
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        throw new Error(err.error || "Upload failed");
+      }
+
+      uploadStatus.textContent = "Done!";
+      fileInput.value = "";
+      uploadBtn.disabled = true;
+      loadImages();
+    } catch (e) {
+      uploadStatus.textContent = e instanceof Error ? e.message : "Upload failed";
+    }
+  });
+
+  interface ImageEntry {
+    key: string;
+    size: number;
+    uploaded: string;
+    source: string;
+  }
+
+  function formatSource(source: string): string {
+    const match = source.match(/^(event|submission):(.+)$/);
+    if (match) {
+      const [, type, slug] = match;
+      const label = type === "event" ? `event ${slug}` : `submission ${slug}`;
+      return `<a href="/events/${slug}" class="image-source-link">${label}</a>`;
+    }
+    return `<span>${source}</span>`;
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  async function loadImages() {
+    loading.style.display = "block";
+    list.innerHTML = "";
+
+    try {
+      const res = await fetch("/api/images");
+      if (!res.ok) throw new Error("Failed to load");
+
+      const images: ImageEntry[] = await res.json();
+      loading.style.display = "none";
+
+      if (images.length === 0) {
+        list.innerHTML = '<p style="color: #666;">No images found.</p>';
+        return;
+      }
+
+      images.sort((a, b) => new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime());
+
+      for (const img of images) {
+        const url = `${window.location.origin}/api/image/${img.key}`;
+        const row = document.createElement("div");
+        row.className = "image-row";
+        row.innerHTML = `
+          <a href="${url}" target="_blank" class="image-thumb-link">
+            <img src="/api/image/${img.key}" class="image-thumb" loading="lazy" />
+          </a>
+          <div class="image-info">
+            <div class="image-key" title="${img.key}">${img.key}</div>
+            <div class="image-meta">${formatSize(img.size)} · ${new Date(img.uploaded).toLocaleDateString()} · <span class="image-source">${formatSource(img.source)}</span></div>
+          </div>
+          <div class="image-actions">
+            <button class="btn btn-sm btn-copy" data-url="${url}">Copy URL</button>
+            <button class="btn btn-sm btn-danger btn-delete" data-key="${img.key}">Delete</button>
+          </div>
+        `;
+        list.appendChild(row);
+      }
+
+      list.querySelectorAll<HTMLButtonElement>(".btn-copy").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          navigator.clipboard.writeText(btn.dataset.url!);
+          btn.textContent = "Copied!";
+          setTimeout(() => (btn.textContent = "Copy URL"), 1500);
+        });
+      });
+
+      list.querySelectorAll<HTMLButtonElement>(".btn-delete").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm(`Delete ${btn.dataset.key}?`)) return;
+          btn.disabled = true;
+          btn.textContent = "…";
+
+          const res = await fetch("/api/images", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: btn.dataset.key }),
+          });
+
+          if (res.ok) {
+            btn.closest(".image-row")?.remove();
+            if (!list.children.length) {
+              list.innerHTML = '<p style="color: #666;">No images found.</p>';
+            }
+          } else {
+            btn.textContent = "Error";
+            btn.disabled = false;
+          }
+        });
+      });
+    } catch {
+      loading.textContent = "Failed to load images.";
+    }
+  }
+
+  loadImages();
+</script>
+
+<style is:global>
+  #image-list {
+    overflow: hidden;
+  }
+
+  .image-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #ccc;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .image-thumb-link {
+    flex-shrink: 0;
+  }
+
+  .image-thumb {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border: 1px solid #ccc;
+    display: block;
+  }
+
+  .image-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .image-key {
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .image-meta {
+    font-size: 11px;
+    color: #666;
+  }
+
+  .image-source {
+    background: #eee;
+    padding: 0 4px;
+    border: 1px solid #ccc;
+    font-size: 10px;
+  }
+
+  .image-source-link {
+    color: #000;
+  }
+
+  .image-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .btn-sm {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  .btn-danger:hover {
+    background: #f00;
+    color: #fff;
+  }
+</style>
