@@ -1,10 +1,11 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
-import { isAdmin } from "../../../lib/auth";
-import type { EventDO } from "../../../do/EventDO";
+import { isAdmin } from "@/lib/auth";
+import { dateKeyToSlug } from "@/lib/dates";
+import type { EventDO } from "@/do/EventDO";
 
 export const POST: APIRoute = async ({ request, redirect }) => {
-  if (!isAdmin(request, env.ADMIN_PASSWORD)) {
+  if (!isAdmin(request)) {
     return redirect("/admin");
   }
 
@@ -12,9 +13,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const date = formData.get("date")?.toString();
   if (!date) return redirect("/admin");
 
-  const id = env.EVENT_DO.idFromName(date);
+  const slug = dateKeyToSlug(date);
+  const id = env.EVENT_DO.idFromName(slug);
   const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-  await stub.init(date);
+  await stub.init(slug);
 
   const cancelled = await stub.isCancelled();
   if (cancelled) {

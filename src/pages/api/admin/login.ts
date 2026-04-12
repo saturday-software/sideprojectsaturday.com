@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
-import { setAdminCookie } from "../../../lib/auth";
+import { setAdminCookie } from "@/lib/auth";
 
 export const POST: APIRoute = async ({ request, redirect }) => {
   const formData = await request.formData();
