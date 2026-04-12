@@ -1,6 +1,7 @@
 import { defineAction, ActionError } from "astro:actions";
 import { env } from "cloudflare:workers";
 import { isDoorOpen } from "@/lib/door";
+import { switchbotPress } from "@/lib/switchbot";
 
 export const space = {
   buzz: defineAction({
@@ -13,12 +14,9 @@ export const space = {
         });
       }
 
-      const result = await switchbotCommand(
-        env.SWITCHBOT_DEVICE_ID,
-        { command: "press", commandType: "command", parameter: "default" },
-      );
-
-      if (result.statusCode !== 100) {
+      try {
+        await switchbotPress(env.SWITCHBOT_DEVICE_ID, env.SWITCHBOT_TOKEN, env.SWITCHBOT_KEY);
+      } catch {
         throw new ActionError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to open door. Please try again.",
@@ -29,35 +27,3 @@ export const space = {
     },
   }),
 };
-
-async function switchbotCommand(deviceId: string, body: Record<string, string>) {
-  const token = env.SWITCHBOT_TOKEN;
-  const secret = env.SWITCHBOT_KEY;
-  const t = String(Date.now());
-  const nonce = String(Math.floor(Math.random() * 1_000_000));
-
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(token + t + nonce));
-  const sign = btoa(String.fromCharCode(...new Uint8Array(signature)));
-
-  const res = await fetch(`https://api.switch-bot.com/v1.1/devices/${deviceId}/commands`, {
-    method: "POST",
-    headers: {
-      Authorization: token,
-      "Content-Type": "application/json",
-      sign,
-      nonce,
-      t,
-    },
-    body: JSON.stringify(body),
-  });
-
-  return res.json() as Promise<{ statusCode: number }>;
-}
