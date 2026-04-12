@@ -1,58 +1,53 @@
+const TZ = "America/New_York";
+
+/** Get the current date parts in New York time. */
+function nyParts(now: Date = new Date()) {
+  const s = now.toLocaleDateString("en-CA", { timeZone: TZ }); // "YYYY-MM-DD"
+  const [y, m, d] = s.split("-").map(Number);
+  const weekday = new Date(y, m - 1, d).getDay(); // 0=Sun, 6=Sat
+  return { y, m, d, weekday };
+}
+
+/** Format a NY date as YYYY-MM-DD. */
+function pad(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** Add days to a date key. */
+function addDays(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(y, m - 1, d + days);
+  return pad(date.getFullYear(), date.getMonth() + 1, date.getDate());
+}
+
 /** Get the Saturday of the current week (or the coming Saturday if today is Sunday). */
 export function getCurrentSaturday(now: Date = new Date()): string {
-  const day = now.getUTCDay(); // 0=Sun, 6=Sat
-  const diff = day <= 6 ? 6 - day : 0;
-  const saturday = new Date(now);
-  // If it's Sunday, move to next Saturday
-  if (day === 0) {
-    saturday.setUTCDate(saturday.getUTCDate() + 6);
-  } else {
-    saturday.setUTCDate(saturday.getUTCDate() + diff);
-  }
-  return formatDateKey(saturday);
+  const { y, m, d, weekday } = nyParts(now);
+  const base = pad(y, m, d);
+  if (weekday === 6) return base; // Saturday
+  if (weekday === 0) return addDays(base, 6); // Sunday → next Saturday
+  return addDays(base, 6 - weekday); // Mon–Fri → this Saturday
 }
 
 /** Get the previous Saturday relative to a given date key. */
 export function getPreviousSaturday(dateKey: string): string {
-  const d = parseDate(dateKey);
-  d.setUTCDate(d.getUTCDate() - 7);
-  return formatDateKey(d);
+  return addDays(dateKey, -7);
 }
 
 /** Get the next Saturday relative to a given date key. */
 export function getNextSaturday(dateKey: string): string {
-  const d = parseDate(dateKey);
-  d.setUTCDate(d.getUTCDate() + 7);
-  return formatDateKey(d);
+  return addDays(dateKey, 7);
 }
 
-/** Human-readable format: "Saturday, April 12, 2026" */
+/** Human-readable format: "2026-04-12" */
 export function formatEventDate(dateKey: string): string {
-  const d = parseDate(dateKey);
-  return d.toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-/** YYYY-MM-DD format */
-function formatDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function parseDate(dateKey: string): Date {
-  return new Date(dateKey + "T00:00:00Z");
+  return dateKey;
 }
 
 /** Check if submission window is open (before Sunday midnight ET for a given Saturday). */
 export function isSubmissionOpen(saturdayKey: string, now: Date = new Date()): boolean {
-  const saturday = parseDate(saturdayKey);
-  // Submission window closes Sunday 11:59pm ET (Monday 4am UTC)
-  const deadline = new Date(saturday);
-  deadline.setUTCDate(deadline.getUTCDate() + 2); // Monday
-  deadline.setUTCHours(4, 0, 0, 0); // 4am UTC = midnight ET
-  return now < deadline;
+  // Compare current NY date to the deadline (end of Sunday)
+  const nowNY = now.toLocaleDateString("en-CA", { timeZone: TZ });
+  const sunday = addDays(saturdayKey, 1);
+  return nowNY <= sunday;
 }
