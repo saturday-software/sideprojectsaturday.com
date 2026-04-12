@@ -1,26 +1,31 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import { isAdmin } from "../lib/auth";
-import { getCurrentSaturday, formatEventDate } from "../lib/dates";
+import { getUpcomingSaturdays, dateKeyToSlug } from "../lib/dates";
+import { generateShareCode } from "../lib/share";
 import { getSubscriberCount } from "../lib/subscribers";
 import { env } from "cloudflare:workers";
 import type { EventDO } from "../do/EventDO";
 const authenticated = isAdmin(Astro.request, env.ADMIN_PASSWORD);
 
-let saturdayKey = "";
-let eventDate = "";
-let cancelled = false;
+const WEEKS_AHEAD = 4;
+
+let events: { date: string; cancelled: boolean }[] = [];
+let shareCode = "";
 let subscriberCount = { total: 0, verified: 0 };
 
 if (authenticated) {
-  saturdayKey = getCurrentSaturday();
-  eventDate = formatEventDate(saturdayKey);
+  const saturdays = getUpcomingSaturdays(WEEKS_AHEAD);
 
-  const id = env.EVENT_DO.idFromName(saturdayKey);
-  const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-  await stub.init(saturdayKey);
-  cancelled = await stub.isCancelled();
+  for (const date of saturdays) {
+    const id = env.EVENT_DO.idFromName(date);
+    const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+    await stub.init(date);
+    events.push({ date, cancelled: await stub.isCancelled() });
+  }
 
+  const nextActive = events.find((e) => !e.cancelled)?.date ?? saturdays[0];
+  shareCode = await generateShareCode(env.SHARE_SEED, nextActive);
   subscriberCount = await getSubscriberCount(env.DB);
 }
 
@@ -44,21 +49,29 @@ const message = Astro.url.searchParams.get("message");
       {message && <div class="message success">{message}</div>}
 
       <section style="margin-bottom: 20px;">
-        <h2>Next Event</h2>
-        <p style="margin-bottom: 4px;">{eventDate}</p>
-        <p style="margin-bottom: 8px;">status: {cancelled ? "cancelled" : "active"}</p>
-        <form method="POST" action="/api/admin/cancel" style="display: inline;">
-          <input type="hidden" name="date" value={saturdayKey} />
-          <button type="submit" class="btn">{cancelled ? "Uncancel" : "Cancel Event"}</button>
-        </form>
+        <h2>Upcoming Events</h2>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          {events.map((event) => (
+            <form method="POST" action="/api/admin/cancel">
+              <input type="hidden" name="date" value={event.date} />
+              <button
+                type="submit"
+                class:list={["btn", "event-toggle", { cancelled: event.cancelled }]}
+                data-tip={event.cancelled ? "Uncancel" : "Cancel"}
+              >
+                {event.date}
+              </button>
+            </form>
+          ))}
+        </div>
       </section>
 
       <hr />
 
       <section style="margin-bottom: 20px;">
-        <h2>Upload Image</h2>
+        <h2>Add event image</h2>
         <form method="POST" action="/api/admin/upload-image" enctype="multipart/form-data">
-          <input type="hidden" name="date" value={saturdayKey} />
+          <input type="hidden" name="date" value={events[0]?.date} />
           <input type="file" name="image" accept="image/*" required />
           <button type="submit" class="btn">Upload</button>
         </form>
@@ -75,9 +88,61 @@ const message = Astro.url.searchParams.get("message");
 
       <section>
         <h2>Links</h2>
-        <p style="margin-bottom: 4px;"><a href={`/event/${saturdayKey}`}>event page →</a></p>
-        <p style="margin-bottom: 0;"><a href={`/recap/${saturdayKey}`}>recap page →</a></p>
+        <p style="margin-bottom: 4px;"><a href={`/share/${shareCode}`}>share page →</a></p>
+        <p style="margin-bottom: 4px;"><a href={`/share/${shareCode}/qr`}>share QR code →</a></p>
+        <p style="margin-bottom: 0;"><a href={`/events/${dateKeyToSlug(events[0]?.date)}`}>event page →</a></p>
       </section>
     </div>
   )}
 </Layout>
+
+<style>
+  .event-toggle {
+    position: relative;
+    padding: 6px 12px;
+    border: 2px solid #000;
+    background: #000;
+    color: #fff;
+    border-radius: 4px;
+  }
+
+  .event-toggle:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    font-size: 11px;
+    padding: 4px 8px;
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  .event-toggle:hover {
+    background: #ff0;
+    color: #000;
+  }
+
+  .event-toggle:active {
+    background: #f00;
+    color: #fff;
+  }
+
+  .event-toggle.cancelled {
+    background: #fff;
+    color: #000;
+    text-decoration: line-through;
+  }
+
+  .event-toggle.cancelled:hover {
+    background: #ff0;
+    color: #000;
+  }
+
+  .event-toggle.cancelled:active {
+    background: #0a0;
+    color: #fff;
+  }
+</style>
