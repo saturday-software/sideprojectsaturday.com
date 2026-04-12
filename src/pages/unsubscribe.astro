@@ -1,7 +1,7 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 import { env } from "cloudflare:workers";
-import { unsubscribe } from "../lib/subscribers";
+import { unsubscribe } from "@/lib/subscribers";
 
 const email = Astro.url.searchParams.get("email");
 let success = false;

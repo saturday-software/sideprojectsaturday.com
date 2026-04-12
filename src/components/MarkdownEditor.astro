@@ -19,7 +19,7 @@ const { name, id = 'editor', label } = Astro.props;
 </div>
 
 <script>
-  import { createMarkdownEditor } from '../lib/markdown-editor';
+  import { createMarkdownEditor } from '@/lib/markdown-editor';
 
   document.querySelectorAll<HTMLDivElement>('.markdown-editor').forEach((root) => {
     if (root.dataset.initialized) return;

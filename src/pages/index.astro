@@ -1,8 +1,8 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import { getCurrentSaturday, getNextSaturday } from "../lib/dates";
+import Layout from "@/layouts/Layout.astro";
+import { getCurrentSaturday, getNextSaturday, dateKeyToSlug } from "@/lib/dates";
 import { env } from "cloudflare:workers";
-import type { EventDO } from "../do/EventDO";
+import type { EventDO } from "@/do/EventDO";
 
 const message = Astro.url.searchParams.get("message");
 const error = Astro.url.searchParams.get("error");
@@ -11,9 +11,10 @@ const error = Astro.url.searchParams.get("error");
 let nextSaturday = getCurrentSaturday();
 let cancelled = true;
 for (let i = 0; i < 4; i++) {
-  const id = env.EVENT_DO.idFromName(nextSaturday);
+  const slug = dateKeyToSlug(nextSaturday);
+  const id = env.EVENT_DO.idFromName(slug);
   const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-  await stub.init(nextSaturday);
+  await stub.init(slug);
   cancelled = await stub.isCancelled();
   if (!cancelled) break;
   nextSaturday = getNextSaturday(nextSaturday);

@@ -1,7 +1,7 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 import { env } from "cloudflare:workers";
-import { verifySubscriber } from "../lib/subscribers";
+import { verifySubscriber } from "@/lib/subscribers";
 
 const token = Astro.url.searchParams.get("token");
 let success = false;
