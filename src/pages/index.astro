@@ -47,9 +47,9 @@ if (!cancelled) {
 }
 ---
 
-<Layout windowTitle="Side Project Saturday" subtitle={nextEventLabel || undefined}>
+<Layout windowTitle="Side Project Saturday">
   <p>
-    Every Saturday, a handful of us get together in Downtown Brooklyn to hack on
+    Every Saturday from 9am–noon, a handful of us get together in Downtown Brooklyn to hack on
      side projects, weird experiments, half-baked ideas.
     At the end, we share what we were working on.
   </p>
@@ -83,4 +83,12 @@ if (!cancelled) {
       <button type="submit" class="btn btn-default">Subscribe</button>
     </div>
   </form>
+
+  <div slot="after" class="after-window">
+    {nextEventLabel && <span class="next-event-badge">{nextEventLabel}</span>}
+    <p class="attribution">
+    Hosted at <a href="https://www.val.town" target="_blank">Val Town</a>.
+    They're <a href="https://www.val.town/careers" target="_blank">hiring</a>.
+    </p>
+  </div>
 </Layout>
