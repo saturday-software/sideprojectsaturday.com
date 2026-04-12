@@ -1,46 +1,27 @@
-# Astro Starter Kit: Basics
+# Side Project Saturday
+
+The website for [sideprojectsaturday.com](https://sideprojectsaturday.com) — a recurring Saturday meetup for working on side projects together.
+
+## Stack
+
+- [Astro](https://astro.build) — site framework
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/) — hosting & runtime
+- [D1](https://developers.cloudflare.com/d1/) — database
+- [R2](https://developers.cloudflare.com/r2/) — image storage
+- [Durable Objects](https://developers.cloudflare.com/durable-objects/) — per-event state
+
+## Development
 
 ```sh
-bun create astro@latest -- --template basics
+bun install
+bun dev
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Deployment
 
-## 🚀 Project Structure
+The site is deployed to Cloudflare Workers via [Wrangler](https://developers.cloudflare.com/workers/wrangler/).
 
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-│   └── favicon.svg
-├── src
-│   ├── assets
-│   │   └── astro.svg
-│   ├── components
-│   │   └── Welcome.astro
-│   ├── layouts
-│   │   └── Layout.astro
-│   └── pages
-│       └── index.astro
-└── package.json
+```sh
+bun run build
+wrangler deploy
 ```
-
-To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `bun install`             | Installs dependencies                            |
-| `bun dev`             | Starts local dev server at `localhost:4321`      |
-| `bun build`           | Build your production site to `./dist/`          |
-| `bun preview`         | Preview your build locally, before deploying     |
-| `bun astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `bun astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
