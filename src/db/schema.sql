@@ -7,3 +7,9 @@ CREATE TABLE IF NOT EXISTS subscribers (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   verified_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS events (
+  date INTEGER PRIMARY KEY NOT NULL,
+  cancelled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
