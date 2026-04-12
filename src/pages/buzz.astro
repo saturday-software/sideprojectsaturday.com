@@ -1,0 +1,37 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { actions } from "astro:actions";
+import { isDoorOpen, getNextOpeningToday } from "@/lib/door";
+import { env } from "cloudflare:workers";
+
+const doorOpen = await isDoorOpen(env.DB);
+const nextOpening = doorOpen ? null : await getNextOpeningToday(env.DB);
+
+const result = Astro.getActionResult(actions.space.buzz);
+const message = result?.data?.message;
+const error = result?.error?.message;
+---
+
+<Layout windowTitle="Door Buzzer">
+  {doorOpen ? (
+    <>
+      <p>Tap the button below to buzz in.</p>
+
+      {message && <div class="message success">{message}</div>}
+      {error && <div class="message error">{error}</div>}
+
+      <form method="POST" action={actions.space.buzz}>
+        <button type="submit" class="btn btn-default" style="width: 100%; padding: 12px;">
+          Open Door
+        </button>
+      </form>
+    </>
+  ) : nextOpening ? (
+    <p>The door will be available at {nextOpening}.</p>
+  ) : (
+    <>
+      <p>No event scheduled for today.</p>
+      <p style="font-size: 12px; color: #666;">If this is a mistake, just press the buzzer for 503.</p>
+    </>
+  )}
+</Layout>

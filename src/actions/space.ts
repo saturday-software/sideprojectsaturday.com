@@ -5,8 +5,8 @@ import { switchbotPress } from "@/lib/switchbot";
 
 export const space = {
   buzz: defineAction({
-    accept: "json",
-    handler: async () => {
+    accept: "form",
+    handler: async (_input, _context) => {
       if (!(await isDoorOpen(env.DB))) {
         throw new ActionError({
           code: "FORBIDDEN",

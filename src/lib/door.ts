@@ -61,6 +61,39 @@ export async function isDoorOpen(db: D1Database, now: Date = new Date()): Promis
   return true;
 }
 
+/** Find the earliest start time later today from enabled rules. Returns null if none. */
+export async function getNextOpeningToday(db: D1Database, now: Date = new Date()): Promise<string | null> {
+  const rules = await getEnabledRules(db);
+  if (rules.length === 0) return null;
+
+  const nyStr = now.toLocaleString("en-US", { timeZone: TZ });
+  const ny = new Date(nyStr);
+  const day = ny.getDay();
+  const minutes = ny.getHours() * 60 + ny.getMinutes();
+
+  const dateKey = getCurrentSaturday(now);
+  const cancelled = await isEventCancelled(db, dateKey);
+
+  // Find rules for today that start after now
+  const upcoming = rules.filter((r) => {
+    if (r.day !== day) return false;
+    const start = r.start_hour * 60 + r.start_minute;
+    if (start <= minutes) return false;
+    if (r.event_only && cancelled) return false;
+    return true;
+  });
+
+  if (upcoming.length === 0) return null;
+
+  // Return the earliest start time
+  const earliest = upcoming.reduce((min, r) => {
+    const start = r.start_hour * 60 + r.start_minute;
+    return start < min ? start : min;
+  }, Infinity);
+
+  return formatTime(Math.floor(earliest / 60), earliest % 60);
+}
+
 export async function getRules(db: D1Database): Promise<DoorRule[]> {
   const { results } = await db
     .prepare("SELECT * FROM door_rules ORDER BY day, start_hour, start_minute")
