@@ -13,13 +13,16 @@
     "generate-types": "wrangler types"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.8",
     "@astrojs/cloudflare": "^13.1.8",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.3",
     "@codemirror/language-data": "^6.5.2",
     "astro": "^6.1.5",
     "codemirror": "^6.0.2",
-    "mimetext": "^3.0.28"
+    "mimetext": "^3.0.28",
+    "typescript": "^6.0.2",
+    "uqr": "^0.1.3"
   },
   "devDependencies": {
     "wrangler": "^4.81.1"
