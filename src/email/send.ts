@@ -1,4 +1,5 @@
 import { createMimeMessage } from "mimetext/browser";
+import { EmailMessage } from "cloudflare:email";
 
 interface SendEmailOptions {
   to: string;

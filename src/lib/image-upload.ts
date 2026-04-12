@@ -6,10 +6,10 @@ export async function uploadImage(file: File): Promise<string> {
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Upload failed" }));
+    const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string };
     throw new Error(err.error || "Failed to upload image");
   }
 
-  const { imageUrl } = await res.json();
+  const { imageUrl } = (await res.json()) as { imageUrl: string };
   return imageUrl;
 }
