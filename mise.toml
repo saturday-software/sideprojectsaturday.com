@@ -23,3 +23,7 @@ run = "astro build"
 [tasks.preview]
 description = "Preview the build"
 run = "astro preview"
+
+[tasks.email]
+description = "Preview email templates in the browser"
+run = "email dev --dir emails --port 3001"
