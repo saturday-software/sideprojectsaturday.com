@@ -1,23 +1,25 @@
 import type { APIRoute } from "astro";
+import { env } from "cloudflare:workers";
 import type { EventDO } from "../../../../do/EventDO";
 import { markAsParticipant } from "../../../../lib/subscribers";
 
-export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
+export const POST: APIRoute = async ({ params, request, redirect }) => {
   const { date } = params;
   if (!date) return redirect("/");
-
-  const env = locals.runtime.env;
   const formData = await request.formData();
 
-  const project_name = formData.get("project_name")?.toString()?.trim();
-  const description = formData.get("description")?.toString()?.trim();
+  const project_name = formData.get("project_name")?.toString()?.trim() || "";
+  const description = formData.get("description")?.toString()?.trim() || "";
   const participant_name = formData.get("participant_name")?.toString()?.trim();
   const email = formData.get("email")?.toString()?.trim().toLowerCase();
   const contact_info = formData.get("contact_info")?.toString()?.trim() || "";
-  const private_details = formData.get("private_details")?.toString()?.trim() || "";
+  const private_details =
+    formData.get("private_details")?.toString()?.trim() || "";
 
-  if (!project_name || !description || !participant_name || !email) {
-    return redirect(`/event/${date}?error=All required fields must be filled out`);
+  if (!participant_name || !email) {
+    return redirect(
+      `/event/${date}?error=All required fields must be filled out`,
+    );
   }
 
   try {
@@ -36,9 +38,11 @@ export const POST: APIRoute = async ({ params, request, locals, redirect }) => {
 
     await markAsParticipant(env.DB, email);
 
-    return redirect(`/event/${date}?message=Project submitted! See you Saturday.`);
+    return redirect(`/recap/${date}`);
   } catch (e) {
     console.error("Submit error:", e);
-    return redirect(`/event/${date}?error=Something went wrong. Please try again.`);
+    return redirect(
+      `/event/${date}?error=Something went wrong. Please try again.`,
+    );
   }
 };

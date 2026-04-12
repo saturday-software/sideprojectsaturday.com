@@ -1,10 +1,10 @@
 import type { APIRoute } from "astro";
+import { env } from "cloudflare:workers";
 import { addSubscriber } from "../../lib/subscribers";
 import { sendEmail } from "../../email/send";
 import { verificationEmail } from "../../email/templates";
 
-export const POST: APIRoute = async ({ request, locals, redirect }) => {
-  const env = locals.runtime.env;
+export const POST: APIRoute = async ({ request, redirect }) => {
   const formData = await request.formData();
   const email = formData.get("email")?.toString()?.trim().toLowerCase();
 

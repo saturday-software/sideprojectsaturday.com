@@ -1,9 +1,9 @@
 import type { APIRoute } from "astro";
+import { env } from "cloudflare:workers";
 import { isAdmin } from "../../../lib/auth";
 import type { EventDO } from "../../../do/EventDO";
 
-export const POST: APIRoute = async ({ request, locals, redirect }) => {
-  const env = locals.runtime.env;
+export const POST: APIRoute = async ({ request, redirect }) => {
   if (!isAdmin(request, env.ADMIN_PASSWORD)) {
     return redirect("/admin");
   }
