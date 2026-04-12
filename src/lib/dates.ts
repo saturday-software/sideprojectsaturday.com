@@ -20,13 +20,44 @@ function addDays(dateKey: string, days: number): string {
   return pad(date.getFullYear(), date.getMonth() + 1, date.getDate());
 }
 
-/** Get the Saturday of the current week (or the coming Saturday if today is Sunday). */
+/** Get the upcoming Saturday for the next event. On Saturday after noon ET, returns next Saturday. */
 export function getCurrentSaturday(now: Date = new Date()): string {
   const { y, m, d, weekday } = nyParts(now);
   const base = pad(y, m, d);
-  if (weekday === 6) return base; // Saturday
+  if (weekday === 6) {
+    const hourNY = parseInt(
+      now.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", hour12: false }),
+      10,
+    );
+    return hourNY >= 12 ? addDays(base, 7) : base;
+  }
   if (weekday === 0) return addDays(base, 6); // Sunday → next Saturday
   return addDays(base, 6 - weekday); // Mon–Fri → this Saturday
+}
+
+/** Get the next N Saturdays starting from the upcoming one. Skips today if the event has started (Saturday >= startHour ET). */
+export function getUpcomingSaturdays(count: number, startHour: number = 9, now: Date = new Date()): string[] {
+  const { y, m, d, weekday } = nyParts(now);
+  const base = pad(y, m, d);
+
+  let first: string;
+  if (weekday === 6) {
+    const hourNY = parseInt(
+      now.toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", hour12: false }),
+      10,
+    );
+    first = hourNY >= startHour ? addDays(base, 7) : base;
+  } else if (weekday === 0) {
+    first = addDays(base, 6);
+  } else {
+    first = addDays(base, 6 - weekday);
+  }
+
+  const results: string[] = [first];
+  for (let i = 1; i < count; i++) {
+    results.push(addDays(first, 7 * i));
+  }
+  return results;
 }
 
 /** Get the previous Saturday relative to a given date key. */
@@ -42,6 +73,21 @@ export function getNextSaturday(dateKey: string): string {
 /** Human-readable format: "2026-04-12" */
 export function formatEventDate(dateKey: string): string {
   return dateKey;
+}
+
+/** Convert a YYYY-MM-DD date key to a YYMMDD URL slug. */
+export function dateKeyToSlug(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-");
+  return y.slice(2) + m + d;
+}
+
+/** Convert a YYMMDD URL slug to a YYYY-MM-DD date key. */
+export function slugToDateKey(slug: string): string {
+  const yy = slug.slice(0, 2);
+  const mm = slug.slice(2, 4);
+  const dd = slug.slice(4, 6);
+  const year = parseInt(yy, 10) >= 70 ? `19${yy}` : `20${yy}`;
+  return `${year}-${mm}-${dd}`;
 }
 
 /** Check if submission window is open (before Sunday midnight ET for a given Saturday). */
