@@ -1,7 +1,7 @@
 {
   "compatibility_date": "2026-04-11",
   "compatibility_flags": ["global_fetch_strictly_public"],
-  "name": "side-project-saturday",
+  "name": "side-project",
   "main": "./src/worker.ts",
   "assets": {
     "directory": "./dist",
