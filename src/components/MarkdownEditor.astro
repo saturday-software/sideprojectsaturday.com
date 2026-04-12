@@ -3,8 +3,9 @@ interface Props {
   name: string;
   id?: string;
   label?: string;
+  uploadSource?: string;
 }
-const { name, id = 'editor', label } = Astro.props;
+const { name, id = 'editor', label, uploadSource } = Astro.props;
 ---
 
 <div class="markdown-editor-wrapper" data-editor-id={id} data-label={label}>
@@ -15,7 +16,7 @@ const { name, id = 'editor', label } = Astro.props;
     </div>
   )}
   <input type="hidden" id={`${id}-hidden`} name={name} />
-  <div id={id} class="markdown-editor" data-hidden={`${id}-hidden`}></div>
+  <div id={id} class="markdown-editor" data-hidden={`${id}-hidden`} data-upload-source={uploadSource}></div>
 </div>
 
 <script>
@@ -25,7 +26,8 @@ const { name, id = 'editor', label } = Astro.props;
     if (root.dataset.initialized) return;
     root.dataset.initialized = '1';
     const hidden = document.getElementById(root.dataset.hidden!) as HTMLInputElement;
-    if (hidden) createMarkdownEditor(root, hidden);
+    const source = root.dataset.uploadSource;
+    if (hidden) createMarkdownEditor(root, hidden, source);
   });
 
   document.querySelectorAll<HTMLButtonElement>('.expand-btn').forEach((btn) => {

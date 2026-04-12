@@ -265,14 +265,14 @@ function getImageFiles(dataTransfer: DataTransfer | null): File[] {
   return Array.from(dataTransfer.files).filter((f) => f.type.startsWith('image/'));
 }
 
-function handleImageInsert(view: EditorView, files: File[], pos?: number) {
+function handleImageInsert(view: EditorView, files: File[], pos?: number, source?: string) {
   for (const file of files) {
     const insertPos = pos ?? view.state.selection.main.head;
     const placeholder = '![Uploading...]()\n';
     view.dispatch({ changes: { from: insertPos, insert: placeholder } });
 
     const placeholderFrom = insertPos;
-    uploadImage(file).then((imageUrl) => {
+    uploadImage(file, source).then((imageUrl) => {
       // Find and replace the placeholder
       const doc = view.state.doc.toString();
       const idx = doc.indexOf('![Uploading...]()', placeholderFrom);
@@ -295,35 +295,37 @@ function handleImageInsert(view: EditorView, files: File[], pos?: number) {
   }
 }
 
-const imageDropPaste = EditorView.domEventHandlers({
-  drop(event, view) {
-    const files = getImageFiles(event.dataTransfer);
-    if (files.length === 0) return false;
-    event.preventDefault();
-    view.dom.classList.remove('cm-drag-over');
-    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-    handleImageInsert(view, files, pos ?? undefined);
-    return true;
-  },
-  paste(event, view) {
-    const files = getImageFiles(event.clipboardData);
-    if (files.length === 0) return false;
-    event.preventDefault();
-    handleImageInsert(view, files);
-    return true;
-  },
-  dragover(event, view) {
-    if (event.dataTransfer?.types.includes('Files')) {
+function imageDropPaste(source?: string) {
+  return EditorView.domEventHandlers({
+    drop(event, view) {
+      const files = getImageFiles(event.dataTransfer);
+      if (files.length === 0) return false;
       event.preventDefault();
-      view.dom.classList.add('cm-drag-over');
-    }
-    return false;
-  },
-  dragleave(_event, view) {
-    view.dom.classList.remove('cm-drag-over');
-    return false;
-  },
-});
+      view.dom.classList.remove('cm-drag-over');
+      const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+      handleImageInsert(view, files, pos ?? undefined, source);
+      return true;
+    },
+    paste(event, view) {
+      const files = getImageFiles(event.clipboardData);
+      if (files.length === 0) return false;
+      event.preventDefault();
+      handleImageInsert(view, files, undefined, source);
+      return true;
+    },
+    dragover(event, view) {
+      if (event.dataTransfer?.types.includes('Files')) {
+        event.preventDefault();
+        view.dom.classList.add('cm-drag-over');
+      }
+      return false;
+    },
+    dragleave(_event, view) {
+      view.dom.classList.remove('cm-drag-over');
+      return false;
+    },
+  });
+}
 
 function minLines(n: number): Extension {
   return EditorState.transactionFilter.of((tr) => {
@@ -334,7 +336,7 @@ function minLines(n: number): Extension {
   });
 }
 
-export function createMarkdownEditor(root: HTMLElement, hidden: HTMLInputElement) {
+export function createMarkdownEditor(root: HTMLElement, hidden: HTMLInputElement, source?: string) {
   const minLinesCompartment = new Compartment();
 
   const view = new EditorView({
@@ -347,7 +349,7 @@ export function createMarkdownEditor(root: HTMLElement, hidden: HTMLInputElement
         EditorView.lineWrapping,
         minLinesCompartment.of(minLines(3)),
         collapseMarkdown,
-        imageDropPaste,
+        imageDropPaste(source),
       ],
     }),
     parent: root,

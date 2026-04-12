@@ -1,7 +1,7 @@
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(file: File, source = "submission"): Promise<string> {
   const res = await fetch("/api/upload-url", {
     method: "POST",
-    headers: { "Content-Type": file.type },
+    headers: { "Content-Type": file.type, "X-Upload-Source": source },
     body: file,
   });
 
