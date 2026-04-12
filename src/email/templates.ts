@@ -55,7 +55,7 @@ export async function wednesdayAnnouncement(
       <h2>Side Project Saturday</h2>
       <p><strong>${eventDate}</strong></p>
       <p>📍 ${address}</p>
-      <p><a href="${calLink}">Add to Google Calendar</a></p>
+      <p><a href="${calLink}">Add to Calendar</a></p>
       <p>Come work on your side projects and share what you've been building!</p>
       <p><a href="${siteUrl}/share/${shareCode}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit a project</a></p>
       ${recapSection}
@@ -98,7 +98,7 @@ export async function fridayReminder(
       <h2>See you tomorrow!</h2>
       <p><strong>${eventDate}</strong></p>
       <p>📍 ${address}</p>
-      <p><a href="${calLink}">Add to Google Calendar</a></p>
+      <p><a href="${calLink}">Add to Calendar</a></p>
       <p><a href="${siteUrl}/share/${shareCode}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit a project</a></p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
       <p style="color: #999; font-size: 12px;"><a href="${siteUrl}/unsubscribe?email=%%EMAIL%%">Unsubscribe</a></p>
