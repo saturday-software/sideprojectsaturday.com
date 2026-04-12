@@ -40,7 +40,7 @@ export async function wednesdayAnnouncement(
   let recapSection = "";
   if (lastWeekSubmissions.length > 0) {
     const items = lastWeekSubmissions
-      .map((s) => `<li><strong>${s.project_name}</strong> by ${s.participant_name} — ${s.description}</li>`)
+      .map((s) => `<li><strong>${s.participant_name}</strong>${s.description ? ` — ${s.description}` : ""}</li>`)
       .join("\n");
     recapSection = `
       <h3>Last Week's Projects</h3>
@@ -123,8 +123,7 @@ export function sundayRecap(
     .map(
       (s) => `
       <div style="margin-bottom: 20px; padding: 16px; background: #f9f9f9; border-radius: 8px;">
-        <h3 style="margin: 0 0 8px 0;">${s.project_name}</h3>
-        <p style="margin: 0 0 4px 0;">by <strong>${s.participant_name}</strong></p>
+        <h3 style="margin: 0 0 8px 0;">${s.participant_name}</h3>
         <p style="margin: 0 0 4px 0;">${s.description}</p>
         ${s.contact_info ? `<p style="margin: 0 0 4px 0; color: #666;">Contact: ${s.contact_info}</p>` : ""}
         ${s.private_details ? `<p style="margin: 0; color: #666; font-style: italic;">${s.private_details}</p>` : ""}

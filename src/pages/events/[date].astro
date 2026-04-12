@@ -1,7 +1,10 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { actions } from "astro:actions";
 import { formatEventDate, slugToDateKey } from "@/lib/dates";
+import { eventImageKey } from "@/lib/events";
 import { renderMarkdown } from "@/lib/render-markdown";
+import { isAdmin } from "@/lib/auth";
 import { env } from "cloudflare:workers";
 import type { EventDO } from "@/do/EventDO";
 
@@ -14,15 +17,24 @@ const id = env.EVENT_DO.idFromName(slug);
 const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
 
 const submissions = await stub.getPublicSubmissions();
-const imageKey = await stub.getImageKey();
+const imageKey = eventImageKey(slug);
+const hasImage = await env.IMAGES_BUCKET.head(imageKey) !== null;
 const eventDate = formatEventDate(date);
+const authenticated = isAdmin(Astro.request);
+
+const uploadResult = Astro.getActionResult(actions.events.uploadImage);
+const message = uploadResult?.data?.message;
+const error = uploadResult?.error?.message;
 ---
 
 <Layout title={`Event: ${eventDate} — Side Project Saturday`} windowTitle="Side Project Saturday">
   <h1>Event</h1>
   <p>{eventDate}</p>
 
-  {imageKey && (
+  {message && <div class="message success">{message}</div>}
+  {error && <div class="message error">{error}</div>}
+
+  {hasImage && (
     <img
       src={`/api/image/${imageKey}`}
       alt="Event photo"
@@ -30,12 +42,19 @@ const eventDate = formatEventDate(date);
     />
   )}
 
+  {authenticated && (
+    <form method="POST" action={actions.events.uploadImage} enctype="multipart/form-data" style="margin-bottom: 16px;">
+      <input type="hidden" name="slug" value={slug} />
+      <input type="file" name="image" accept="image/*" required />
+      <button type="submit" class="btn">Upload image</button>
+    </form>
+  )}
+
   {submissions.length > 0 ? (
     <div>
       {submissions.map((s) => (
         <div class="project-card">
-          <h2 style="text-transform: none; letter-spacing: normal;">{s.project_name}</h2>
-          <p style="margin-bottom: 4px; color: #666; font-size: 11px;">by {s.participant_name}</p>
+          <h2 style="text-transform: none; letter-spacing: normal;">{s.participant_name}</h2>
           <p style="margin-bottom: 0;" set:html={renderMarkdown(s.description)} />
         </div>
       ))}
