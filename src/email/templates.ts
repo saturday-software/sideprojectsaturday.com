@@ -1,6 +1,7 @@
-import { formatEventDate } from "../lib/dates";
+import { formatEventDate, dateKeyToSlug } from "@/lib/dates";
+import { generateShareCode } from "@/lib/share";
 import { getCalendarLink } from "./calendar";
-import type { PublicSubmission, Submission } from "../do/EventDO";
+import type { PublicSubmission, Submission } from "@/do/EventDO";
 
 function layout(content: string): string {
   return `<!DOCTYPE html>
@@ -24,15 +25,17 @@ export function verificationEmail(siteUrl: string, token: string): { subject: st
   };
 }
 
-export function wednesdayAnnouncement(
+export async function wednesdayAnnouncement(
   dateKey: string,
   address: string,
   siteUrl: string,
   lastWeekSubmissions: PublicSubmission[],
-  lastWeekDate: string
-): { subject: string; html: string } {
+  lastWeekDate: string,
+  shareSeed: string
+): Promise<{ subject: string; html: string }> {
   const eventDate = formatEventDate(dateKey);
   const calLink = getCalendarLink(dateKey, address);
+  const shareCode = await generateShareCode(shareSeed, dateKey);
 
   let recapSection = "";
   if (lastWeekSubmissions.length > 0) {
@@ -42,7 +45,7 @@ export function wednesdayAnnouncement(
     recapSection = `
       <h3>Last Week's Projects</h3>
       <ul>${items}</ul>
-      <p><a href="${siteUrl}/recap/${lastWeekDate}">View full recap →</a></p>
+      <p><a href="${siteUrl}/events/${dateKeyToSlug(lastWeekDate)}">View full recap →</a></p>
     `;
   }
 
@@ -54,7 +57,7 @@ export function wednesdayAnnouncement(
       <p>📍 ${address}</p>
       <p><a href="${calLink}">Add to Google Calendar</a></p>
       <p>Come work on your side projects and share what you've been building!</p>
-      <p><a href="${siteUrl}/event/${dateKey}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit a project</a></p>
+      <p><a href="${siteUrl}/share/${shareCode}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit a project</a></p>
       ${recapSection}
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
       <p style="color: #999; font-size: 12px;"><a href="${siteUrl}/unsubscribe?email=%%EMAIL%%">Unsubscribe</a></p>
@@ -79,13 +82,15 @@ export function wednesdayCancellation(
   };
 }
 
-export function fridayReminder(
+export async function fridayReminder(
   dateKey: string,
   address: string,
-  siteUrl: string
-): { subject: string; html: string } {
+  siteUrl: string,
+  shareSeed: string
+): Promise<{ subject: string; html: string }> {
   const eventDate = formatEventDate(dateKey);
   const calLink = getCalendarLink(dateKey, address);
+  const shareCode = await generateShareCode(shareSeed, dateKey);
 
   return {
     subject: `Reminder: Side Project Saturday is tomorrow!`,
@@ -94,7 +99,7 @@ export function fridayReminder(
       <p><strong>${eventDate}</strong></p>
       <p>📍 ${address}</p>
       <p><a href="${calLink}">Add to Google Calendar</a></p>
-      <p><a href="${siteUrl}/event/${dateKey}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit a project</a></p>
+      <p><a href="${siteUrl}/share/${shareCode}" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Submit a project</a></p>
       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
       <p style="color: #999; font-size: 12px;"><a href="${siteUrl}/unsubscribe?email=%%EMAIL%%">Unsubscribe</a></p>
     `),

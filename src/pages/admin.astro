@@ -1,12 +1,12 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import { isAdmin } from "../lib/auth";
-import { getUpcomingSaturdays, dateKeyToSlug } from "../lib/dates";
-import { generateShareCode } from "../lib/share";
-import { getSubscriberCount } from "../lib/subscribers";
+import Layout from "@/layouts/Layout.astro";
+import { isAdmin } from "@/lib/auth";
+import { getUpcomingSaturdays, dateKeyToSlug } from "@/lib/dates";
+import { generateShareCode } from "@/lib/share";
+import { getSubscriberCount } from "@/lib/subscribers";
 import { env } from "cloudflare:workers";
-import type { EventDO } from "../do/EventDO";
-const authenticated = isAdmin(Astro.request, env.ADMIN_PASSWORD);
+import type { EventDO } from "@/do/EventDO";
+const authenticated = isAdmin(Astro.request);
 
 const WEEKS_AHEAD = 4;
 
@@ -18,9 +18,10 @@ if (authenticated) {
   const saturdays = getUpcomingSaturdays(WEEKS_AHEAD);
 
   for (const date of saturdays) {
-    const id = env.EVENT_DO.idFromName(date);
+    const slug = dateKeyToSlug(date);
+    const id = env.EVENT_DO.idFromName(slug);
     const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-    await stub.init(date);
+    await stub.init(slug);
     events.push({ date, cancelled: await stub.isCancelled() });
   }
 
