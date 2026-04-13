@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { parseArgs } from "util";
 import { resolve } from "path";
+import { select, text, intro, outro, isCancel, cancel } from "@clack/prompts";
 import {
   verificationEmail,
   wednesdayAnnouncement,
@@ -18,38 +19,47 @@ const TEMPLATES = [
   "sunday-recap",
 ] as const;
 
+type Template = (typeof TEMPLATES)[number];
+
 const { values, positionals } = parseArgs({
   args: Bun.argv.slice(2),
   options: {
     to: { type: "string" },
     date: { type: "string" },
-    help: { type: "boolean", short: "h" },
   },
   allowPositionals: true,
 });
 
-if (values.help || positionals.length === 0) {
-  console.log(`Usage: bun scripts/send-test-email.ts <template> --to <email> [--date YYYY-MM-DD]
+intro("Send test email");
 
-Templates:
-  ${TEMPLATES.join("\n  ")}
-
-Options:
-  --to     Recipient email address (required)
-  --date   Saturday date key (default: upcoming Saturday)
-  -h       Show this help`);
-  process.exit(0);
+let template: Template;
+if (positionals[0] && TEMPLATES.includes(positionals[0] as Template)) {
+  template = positionals[0] as Template;
+} else {
+  const result = await select({
+    message: "Pick a template",
+    options: TEMPLATES.map((t) => ({ value: t, label: t })),
+  });
+  if (isCancel(result)) {
+    cancel("Cancelled");
+    process.exit(0);
+  }
+  template = result;
 }
 
-const template = positionals[0] as (typeof TEMPLATES)[number];
-if (!TEMPLATES.includes(template)) {
-  console.error(`Unknown template: ${template}\nAvailable: ${TEMPLATES.join(", ")}`);
-  process.exit(1);
-}
-
-if (!values.to) {
-  console.error("--to is required");
-  process.exit(1);
+let to: string;
+if (values.to) {
+  to = values.to;
+} else {
+  const result = await text({
+    message: "Recipient email address",
+    validate: (v) => (v.includes("@") ? undefined : "Must be a valid email"),
+  });
+  if (isCancel(result)) {
+    cancel("Cancelled");
+    process.exit(0);
+  }
+  to = result;
 }
 
 const dateKey = values.date ?? getCurrentSaturday();
@@ -67,13 +77,13 @@ async function generate(): Promise<{ subject: string; html: string }> {
       return wednesdayAnnouncement(dateKey, address, siteUrl, [
         { participant_name: "Alice", description: "Built a weather CLI in Rust" },
         { participant_name: "Bob", description: "Designed a logo for my podcast" },
-      ], dateKey, shareSeed);
+      ], dateKey);
 
     case "wednesday-cancellation":
       return wednesdayCancellation(dateKey, siteUrl);
 
     case "friday-reminder":
-      return fridayReminder(dateKey, address, siteUrl, shareSeed);
+      return fridayReminder(dateKey, address, siteUrl);
 
     case "sunday-recap":
       return sundayRecap(dateKey, [
@@ -85,20 +95,19 @@ async function generate(): Promise<{ subject: string; html: string }> {
 }
 
 const { subject, html } = await generate();
-const rendered = html.replace("%%EMAIL%%", encodeURIComponent(values.to));
+const rendered = html.replace("%%EMAIL%%", encodeURIComponent(to));
 
 const wrangler = resolve(import.meta.dir, "../node_modules/.bin/wrangler");
-
-console.log(`Sending "${subject}" to ${values.to}...`);
-
 const configFile = resolve(import.meta.dir, "../wrangler.jsonc");
+
+console.log(`\nSending "${subject}" to ${to}...`);
 
 const proc = Bun.spawn(
   [wrangler, "email", "sending", "send",
     "--config", configFile,
     "--from", from,
     "--from-name", "Side Project Saturday",
-    "--to", values.to,
+    "--to", to,
     "--subject", subject,
     "--html", rendered,
   ],
@@ -106,4 +115,9 @@ const proc = Bun.spawn(
 );
 
 await proc.exited;
-process.exit(proc.exitCode ?? 0);
+
+if (proc.exitCode === 0) {
+  outro("Email sent!");
+} else {
+  process.exit(proc.exitCode ?? 1);
+}

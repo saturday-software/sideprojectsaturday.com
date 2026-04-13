@@ -50,13 +50,12 @@ export default {
 
       const template = cancelled
         ? wednesdayCancellation(saturdayKey, env.SITE_URL)
-        : await wednesdayAnnouncement(
+        : wednesdayAnnouncement(
             saturdayKey,
             env.EVENT_ADDRESS,
             env.SITE_URL,
             lastWeekSubmissions,
             lastWeekKey,
-            env.SHARE_SEED
           );
 
       for (const sub of subscribers) {
@@ -75,7 +74,7 @@ export default {
       if (cancelled) return;
 
       const subscribers = await getVerifiedSubscribers(env.DB);
-      const template = await fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL, env.SHARE_SEED);
+      const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
       for (const sub of subscribers) {
         const html = template.html.replace("%%EMAIL%%", encodeURIComponent(sub.email));
