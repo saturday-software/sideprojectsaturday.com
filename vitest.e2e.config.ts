@@ -14,9 +14,7 @@ export default defineConfig({
       enabled: true,
       provider: playwright({
         launchOptions: {
-          executablePath:
-            process.env.CHROMIUM_PATH ??
-            "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+          executablePath: process.env.CHROMIUM_PATH || undefined,
           args: [
             "--no-sandbox",
             "--disable-gpu",
