@@ -11,6 +11,7 @@ postinstall = "bun install"
 
 [env]
 _.path = "node_modules/.bin"
+CLOUDFLARE_ACCOUNT_ID = "6de942b9cdb2c3f3d040fdbe3c1975c5"
 
 [tasks.dev]
 description = "Start development server"
@@ -24,6 +25,12 @@ run = "astro build"
 description = "Preview the build"
 run = "astro preview"
 
-[tasks.email]
-description = "Preview email templates in the browser"
-run = "email dev --dir emails --port 3001"
+[tasks.test]
+description = "Run tests"
+run = "vitest"
+
+[tasks.send-email]
+description = "Send a test email: mise run send-email <template> --to <email>"
+run = "bun scripts/send-test-email.ts"
+raw = true
+
