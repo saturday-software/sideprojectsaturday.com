@@ -41,58 +41,54 @@ export async function setup() {
   mkdirSync(join(process.cwd(), ".wrangler"), { recursive: true });
   const logStream = createWriteStream(DEV_LOG_PATH);
 
-  await new Promise<void>((resolve, reject) => {
-    devServer = spawn(
-      "node",
-      ["./node_modules/.bin/astro", "dev", "--port", "4322"],
-      {
-        stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env },
-        cwd: process.cwd(),
-      },
-    );
+  devServer = spawn(
+    "node",
+    ["./node_modules/.bin/astro", "dev", "--port", "4322"],
+    {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env },
+      cwd: process.cwd(),
+      detached: true,
+    },
+  );
 
-    const timeout = setTimeout(() => {
-      reject(new Error("Dev server failed to start within 60s"));
-    }, 60_000);
+  // Pipe output to log file (used by waitForSentEmail to find .eml paths)
+  devServer.stdout?.on("data", (data: Buffer) => logStream.write(data));
+  devServer.stderr?.on("data", (data: Buffer) => logStream.write(data));
 
-    let resolved = false;
-    const onData = (data: Buffer) => {
-      logStream.write(data);
-      const text = data.toString();
-      if (!resolved && text.includes("localhost:4322")) {
-        resolved = true;
-        clearTimeout(timeout);
-        console.log("[e2e] Dev server ready");
-        setTimeout(resolve, 2_000);
-      }
-    };
-
-    devServer.stdout?.on("data", onData);
-    devServer.stderr?.on("data", onData);
-    devServer.on("error", (err) => {
-      if (!resolved) {
-        clearTimeout(timeout);
-        reject(err);
-      }
-    });
-    devServer.on("exit", (code) => {
-      logStream.end();
-      if (!resolved) {
-        clearTimeout(timeout);
-        reject(new Error(`Dev server exited with code ${code}`));
-      }
-    });
-  });
+  // Poll the port instead of watching stdout — piped stdout is block-buffered
+  // so the "localhost:4322" line can be delayed by 20+ seconds.
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (await isPortOpen(4322)) {
+      console.log("[e2e] Dev server ready");
+      return;
+    }
+    // Check if the process died
+    if (devServer.exitCode !== null) {
+      throw new Error(`Dev server exited with code ${devServer.exitCode}`);
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  throw new Error("Dev server failed to start within 60s");
 }
 
 export async function teardown() {
-  if (devServer && !devServer.killed) {
+  if (devServer && !devServer.killed && devServer.pid) {
     console.log("[e2e] Stopping dev server...");
-    devServer.kill("SIGTERM");
+    // Kill the entire process group (astro spawns child processes for vite/wrangler)
+    try {
+      process.kill(-devServer.pid, "SIGTERM");
+    } catch {}
     await new Promise<void>((resolve) => {
       devServer!.on("exit", resolve);
-      setTimeout(resolve, 5_000);
+      setTimeout(() => {
+        // Force kill if still alive
+        try {
+          process.kill(-devServer!.pid!, "SIGKILL");
+        } catch {}
+        resolve();
+      }, 3_000);
     });
   }
 }

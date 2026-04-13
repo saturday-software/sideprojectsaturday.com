@@ -29,6 +29,10 @@ run = "astro preview"
 description = "Run tests"
 run = "vitest"
 
+[tasks."test:e2e"]
+description = "Run e2e browser tests"
+run = "vitest --config vitest.e2e.config.ts"
+
 [tasks.send-email]
 description = "Send a test email"
 run = "bun scripts/send-test-email.ts"
