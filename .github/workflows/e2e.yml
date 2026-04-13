@@ -28,5 +28,16 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install chromium --with-deps
 
+      - name: Apply D1 schema
+        run: npx wrangler d1 execute sps --local --file=src/db/schema.sql
+
+      - name: Start dev server
+        run: |
+          mkdir -p .wrangler
+          node ./node_modules/.bin/astro dev --port 4322 > .wrangler/e2e-dev.log 2>&1 &
+          # Wait for the server to be ready
+          timeout 60 bash -c 'until curl -s http://localhost:4322 > /dev/null 2>&1; do sleep 1; done'
+          echo "Dev server is ready"
+
       - name: Run e2e tests
         run: bun run test:e2e
