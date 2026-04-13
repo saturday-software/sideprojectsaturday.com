@@ -90,6 +90,18 @@ export function slugToDateKey(slug: string): string {
   return `${year}-${mm}-${dd}`;
 }
 
+/** Get today's date key in NY time. */
+export function todayDateKey(now: Date = new Date()): string {
+  const { y, m, d } = nyParts(now);
+  return pad(y, m, d);
+}
+
+/** Check if a date key falls on a Saturday. */
+export function isSaturday(dateKey: string): boolean {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay() === 6;
+}
+
 /** Check if current time is within Saturday event hours (9am–12pm ET). */
 export function isWithinEventHours(now: Date = new Date()): boolean {
   const { weekday } = nyParts(now);
