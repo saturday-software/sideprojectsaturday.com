@@ -1,7 +1,7 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { actions } from "astro:actions";
-import { formatEventDate, slugToDateKey } from "@/lib/dates";
+import { formatEventDate, slugToDateKey, isSaturday, todayDateKey } from "@/lib/dates";
 import { eventImageKey } from "@/lib/events";
 import { renderMarkdown } from "@/lib/render-markdown";
 import { isAdmin } from "@/lib/auth";
@@ -10,15 +10,24 @@ import type { EventDO } from "@/do/EventDO";
 
 const { date: slug } = Astro.params;
 if (!slug || !/^\d{6}$/.test(slug)) {
-  return Astro.redirect("/");
+  return new Response(null, { status: 404 });
 }
 const date = slugToDateKey(slug);
+
+// Check if the date is a Saturday
+if (!isSaturday(date)) {
+  return new Response(null, { status: 404 });
+}
+
+// Check if the event is in the future
+const isFuture = date > todayDateKey();
+
 const id = env.EVENT_DO.idFromName(slug);
 const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
 
-const submissions = await stub.getPublicSubmissions();
+const submissions = isFuture ? [] : await stub.getPublicSubmissions();
 const imageKey = eventImageKey(slug);
-const hasImage = await env.IMAGES_BUCKET.head(imageKey) !== null;
+const hasImage = isFuture ? false : await env.IMAGES_BUCKET.head(imageKey) !== null;
 const eventDate = formatEventDate(date);
 const authenticated = isAdmin(Astro.request);
 
@@ -50,7 +59,9 @@ const error = uploadResult?.error?.message;
     </form>
   )}
 
-  {submissions.length > 0 ? (
+  {isFuture ? (
+    <p>This event hasn't happened yet! Check back after {eventDate} to see what people built.</p>
+  ) : submissions.length > 0 ? (
     <div>
       {submissions.map((s) => (
         <div class="project-card">
