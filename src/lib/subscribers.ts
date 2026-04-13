@@ -1,27 +1,41 @@
+type AddSubscriberResult =
+  | { status: "verified" }
+  | { status: "rate_limited" }
+  | { status: "sent"; token: string };
+
 export async function addSubscriber(
   db: D1Database,
   email: string
-): Promise<{ token: string; existing: boolean }> {
-  const token = crypto.randomUUID();
-
-  // Check if already exists
+): Promise<AddSubscriberResult> {
   const existing = await db
-    .prepare("SELECT id, status FROM subscribers WHERE email = ?")
+    .prepare("SELECT id, status, created_at FROM subscribers WHERE email = ?")
     .bind(email)
-    .first<{ id: number; status: string }>();
+    .first<{ id: number; status: string; created_at: string }>();
 
   if (existing) {
     if (existing.status === "verified") {
-      return { token: "", existing: true };
+      return { status: "verified" };
     }
-    // Re-send verification for pending subscribers
+
+    // Rate limit: don't resend if pending row was created/updated < 10 min ago
+    const createdAt = new Date(existing.created_at + "Z").getTime();
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    if (createdAt > tenMinutesAgo) {
+      return { status: "rate_limited" };
+    }
+
+    // Refresh token and timestamp for pending/unsubscribed
+    const token = crypto.randomUUID();
     await db
-      .prepare("UPDATE subscribers SET verification_token = ? WHERE email = ?")
+      .prepare(
+        "UPDATE subscribers SET verification_token = ?, status = 'pending', created_at = datetime('now') WHERE email = ?"
+      )
       .bind(token, email)
       .run();
-    return { token, existing: false };
+    return { status: "sent", token };
   }
 
+  const token = crypto.randomUUID();
   await db
     .prepare(
       "INSERT INTO subscribers (email, status, verification_token) VALUES (?, 'pending', ?)"
@@ -29,7 +43,7 @@ export async function addSubscriber(
     .bind(email, token)
     .run();
 
-  return { token, existing: false };
+  return { status: "sent", token };
 }
 
 export async function verifySubscriber(
@@ -104,4 +118,19 @@ export async function getSubscriberCount(
     total: total?.count ?? 0,
     verified: verified?.count ?? 0,
   };
+}
+
+/** Delete pending subscribers whose verification expired. */
+export async function cleanupExpiredPending(
+  db: D1Database,
+  maxAgeHours: number = 2
+): Promise<number> {
+  const result = await db
+    .prepare(
+      "DELETE FROM subscribers WHERE status = 'pending' AND created_at < datetime('now', ?)"
+    )
+    .bind(`-${maxAgeHours} hours`)
+    .run();
+
+  return result.meta?.changes ?? 0;
 }

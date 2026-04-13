@@ -5,6 +5,8 @@ import { addSubscriber } from "@/lib/subscribers";
 import { sendEmail } from "@/email/send";
 import { verificationEmail } from "@/email/templates";
 
+const FROM = "hello@sideprojectsaturday.com";
+
 export const subscribe = defineAction({
   accept: "form",
   input: z.object({
@@ -12,13 +14,23 @@ export const subscribe = defineAction({
   }),
   handler: async ({ email }) => {
     const normalized = email.trim().toLowerCase();
-    const { token, existing } = await addSubscriber(env.DB, normalized);
+    const result = await addSubscriber(env.DB, normalized);
 
-    if (existing) {
-      return { message: "You're already subscribed!" };
+    if (result.status === "verified") {
+      return {
+        kind: "already_subscribed" as const,
+        message: `You're already subscribed! You'll receive emails from ${FROM}.`,
+      };
     }
 
-    const template = verificationEmail(env.SITE_URL, token);
+    if (result.status === "rate_limited") {
+      return {
+        kind: "sent" as const,
+        message: `We already sent you a verification email. Check your inbox for an email from ${FROM}.`,
+      };
+    }
+
+    const template = verificationEmail(env.SITE_URL, result.token);
     await sendEmail(env.EMAIL, {
       to: normalized,
       subject: template.subject,
@@ -26,6 +38,9 @@ export const subscribe = defineAction({
       from: env.FROM_EMAIL,
     });
 
-    return { message: "Check your email to confirm your subscription!" };
+    return {
+      kind: "sent" as const,
+      message: `Check your inbox for an email from ${FROM} to confirm your subscription.`,
+    };
   },
 });

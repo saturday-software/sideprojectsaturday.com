@@ -12,7 +12,7 @@ import {
 } from "./email/templates";
 import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
 import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
-import { getVerifiedSubscribers, getParticipants } from "./lib/subscribers";
+import { getVerifiedSubscribers, getParticipants, cleanupExpiredPending } from "./lib/subscribers";
 
 function getEventDO(env: Env, slug: string) {
   const id = env.EVENT_DO.idFromName(slug);
@@ -32,6 +32,10 @@ export default {
     const cron = controller.cron;
     const now = new Date();
     const saturdayKey = getCurrentSaturday(now);
+
+    // Clean up unverified subscribers on every cron run
+    await cleanupExpiredPending(env.DB);
+
     if (cron === "0 13 * * 3") {
       // Wednesday: announcement or cancellation
       await ensureEvent(env.DB, saturdayKey);
