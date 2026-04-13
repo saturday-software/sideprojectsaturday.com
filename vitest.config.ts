@@ -21,5 +21,7 @@ export default defineConfig({
       "@/": new URL("./src/", import.meta.url).pathname,
     },
   },
-  test: {},
+  test: {
+    exclude: ["**/node_modules/**", "**/dist/**", "src/e2e/**"],
+  },
 });
