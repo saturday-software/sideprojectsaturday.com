@@ -1,5 +1,8 @@
 import type { BrowserCommand } from "vitest/node";
-import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const DEV_LOG_PATH = join(process.cwd(), ".wrangler", "e2e-dev.log");
 
 /**
  * Open a new browser page, navigate to the homepage,
@@ -23,43 +26,47 @@ export const submitSubscription: BrowserCommand<
 };
 
 /**
- * Poll the local D1 database for a pending subscriber's verification token.
- * Returns the token once found, or throws after timeout.
+ * Poll the dev server log for a send_email line containing a .eml path,
+ * then read and return the raw email content.
  */
-export const getVerificationToken: BrowserCommand<
-  [email: string, timeoutMs?: number]
-> = async (_ctx, email, timeoutMs = 10_000) => {
+export const waitForSentEmail: BrowserCommand<
+  [timeoutMs?: number]
+> = async (_ctx, timeoutMs = 10_000) => {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
     try {
-      const output = execSync(
-        `npx wrangler d1 execute sps --local --command="SELECT verification_token FROM subscribers WHERE email = '${email}' AND status = 'pending'"`,
-        { encoding: "utf-8", cwd: process.cwd(), stdio: "pipe" },
-      );
-
-      // Extract JSON array from wrangler output
-      const jsonMatch = output.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const results = JSON.parse(jsonMatch[0]);
-        const token = results[0]?.results?.[0]?.verification_token;
-        if (token) return token as string;
+      const log = readFileSync(DEV_LOG_PATH, "utf-8");
+      // Wrangler logs: [wrangler:inf] send_email binding called with the following message:
+      //   /tmp/miniflare-files/email/test-email-abc123.eml
+      const emlMatch = log.match(/(\S+\.eml)/);
+      if (emlMatch) {
+        const emlPath = emlMatch[1];
+        const content = readFileSync(emlPath, "utf-8");
+        return content;
       }
     } catch {
-      // Subscriber might not exist yet
+      // Log file might not exist yet or eml not written yet
     }
 
     await new Promise((r) => setTimeout(r, 500));
   }
 
-  throw new Error(
-    `No verification token found for ${email} within ${timeoutMs}ms`,
-  );
+  // If no .eml found, dump the log so we can see what wrangler printed
+  try {
+    const log = readFileSync(DEV_LOG_PATH, "utf-8");
+    throw new Error(
+      `No .eml file found in dev server output within ${timeoutMs}ms.\nDev log tail:\n${log.slice(-2000)}`,
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("No .eml")) throw err;
+    throw new Error(`No .eml file found and could not read dev log`);
+  }
 };
 
 /**
  * Open a new browser page, navigate to the given URL,
- * and return the text content of the <h1> element.
+ * and return the text content of the content heading.
  */
 export const visitPage: BrowserCommand<[url: string]> = async (ctx, url) => {
   const page = await ctx.context.newPage();

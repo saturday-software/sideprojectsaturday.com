@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
 import {
   submitSubscription,
-  getVerificationToken,
+  waitForSentEmail,
   visitPage,
 } from "./src/e2e/commands.js";
 
@@ -29,7 +29,7 @@ export default defineConfig({
       instances: [{ browser: "chromium" }],
       commands: {
         submitSubscription,
-        getVerificationToken,
+        waitForSentEmail,
         visitPage,
       },
     },

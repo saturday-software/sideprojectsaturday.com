@@ -1,7 +1,12 @@
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createConnection } from "node:net";
+import { createWriteStream, mkdirSync } from "node:fs";
+import { join } from "node:path";
 
 let devServer: ChildProcess | undefined;
+
+/** Path where we stream the dev server's combined stdout/stderr. */
+export const DEV_LOG_PATH = join(process.cwd(), ".wrangler", "e2e-dev.log");
 
 /** Check if a port is already listening. */
 function isPortOpen(port: number): Promise<boolean> {
@@ -31,6 +36,10 @@ export async function setup() {
 
   console.log("[e2e] Starting dev server...");
 
+  // Stream dev server output to a log file so commands can read it later
+  mkdirSync(join(process.cwd(), ".wrangler"), { recursive: true });
+  const logStream = createWriteStream(DEV_LOG_PATH);
+
   await new Promise<void>((resolve, reject) => {
     devServer = spawn(
       "node",
@@ -48,6 +57,7 @@ export async function setup() {
 
     let resolved = false;
     const onData = (data: Buffer) => {
+      logStream.write(data);
       const text = data.toString();
       if (!resolved && text.includes("localhost:4322")) {
         resolved = true;
@@ -66,6 +76,7 @@ export async function setup() {
       }
     });
     devServer.on("exit", (code) => {
+      logStream.end();
       if (!resolved) {
         clearTimeout(timeout);
         reject(new Error(`Dev server exited with code ${code}`));
