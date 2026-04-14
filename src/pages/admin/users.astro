@@ -1,0 +1,147 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { isAdmin } from "@/lib/auth";
+import { getSubscribers } from "@/lib/subscribers";
+import { env } from "cloudflare:workers";
+
+const authenticated = isAdmin(Astro.request);
+if (!authenticated) {
+  return Astro.redirect("/admin");
+}
+
+const PER_PAGE = 25;
+const page = Math.max(1, Number(Astro.url.searchParams.get("page")) || 1);
+const { subscribers, total } = await getSubscribers(env.DB, page, PER_PAGE);
+const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+---
+
+<Layout title="Users — Side Project Saturday" windowTitle="Users">
+  <div>
+    <h1>Users</h1>
+    <p style="margin-bottom: 12px;">
+      {total} subscriber{total !== 1 && "s"}
+      <a href="/admin" style="margin-left: 12px;">← admin</a>
+    </p>
+
+    {subscribers.length === 0 ? (
+      <p>No subscribers yet.</p>
+    ) : (
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Participant</th>
+            <th>Signed up</th>
+            <th>Verified</th>
+          </tr>
+        </thead>
+        <tbody>
+          {subscribers.map((sub) => (
+            <tr class:list={{ unverified: sub.status !== "verified" }}>
+              <td class="email-cell">{sub.email}</td>
+              <td>
+                <span class:list={["status-badge", `status-${sub.status}`]}>
+                  {sub.status}
+                </span>
+              </td>
+              <td>{sub.is_participant ? "Yes" : "No"}</td>
+              <td class="date-cell">{sub.created_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
+              <td class="date-cell">{sub.verified_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+
+    {totalPages > 1 && (
+      <nav class="pagination">
+        {page > 1 && (
+          <a href={`/admin/users?page=${page - 1}`} class="btn btn-sm">← Prev</a>
+        )}
+        <span class="page-info">Page {page} of {totalPages}</span>
+        {page < totalPages && (
+          <a href={`/admin/users?page=${page + 1}`} class="btn btn-sm">Next →</a>
+        )}
+      </nav>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .users-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .users-table th,
+  .users-table td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .users-table th {
+    font-weight: bold;
+    border-bottom: 2px solid #000;
+    white-space: nowrap;
+  }
+
+  .users-table tr.unverified td {
+    color: #999;
+  }
+
+  .email-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .date-cell {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .status-badge {
+    font-size: 11px;
+    padding: 1px 6px;
+    border: 1px solid #000;
+    white-space: nowrap;
+  }
+
+  .status-verified {
+    background: #000;
+    color: #fff;
+  }
+
+  .status-pending {
+    background: #ff0;
+    color: #000;
+  }
+
+  .status-unsubscribed {
+    background: #fff;
+    color: #999;
+    border-color: #999;
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .page-info {
+    font-size: 13px;
+  }
+
+  .btn-sm {
+    font-size: 12px;
+    padding: 2px 8px;
+    text-decoration: none;
+  }
+</style>

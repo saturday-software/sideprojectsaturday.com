@@ -104,6 +104,36 @@ export async function markAsParticipant(
     .run();
 }
 
+export interface Subscriber {
+  id: number;
+  email: string;
+  status: string;
+  is_participant: number;
+  created_at: string;
+  verified_at: string | null;
+}
+
+export async function getSubscribers(
+  db: D1Database,
+  page: number,
+  perPage: number
+): Promise<{ subscribers: Subscriber[]; total: number }> {
+  const offset = (page - 1) * perPage;
+
+  const total = await db
+    .prepare("SELECT COUNT(*) as count FROM subscribers")
+    .first<{ count: number }>();
+
+  const { results } = await db
+    .prepare(
+      "SELECT id, email, status, is_participant, created_at, verified_at FROM subscribers ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    )
+    .bind(perPage, offset)
+    .all<Subscriber>();
+
+  return { subscribers: results, total: total?.count ?? 0 };
+}
+
 export async function getSubscriberCount(
   db: D1Database
 ): Promise<{ total: number; verified: number }> {
