@@ -4,8 +4,9 @@ interface Props {
   windowTitle?: string;
   subtitle?: string;
   supertitle?: string;
+  wide?: boolean;
 }
-const { title = "Side Project Saturday", windowTitle = "Side Project Saturday", subtitle, supertitle } = Astro.props;
+const { title = "Side Project Saturday", windowTitle = "Side Project Saturday", subtitle, supertitle, wide } = Astro.props;
 ---
 
 <!doctype html>
@@ -20,7 +21,7 @@ const { title = "Side Project Saturday", windowTitle = "Side Project Saturday", 
     <title>{title}</title>
   </head>
   <body>
-    <main>
+    <main class:list={[{ wide }]}>
       {supertitle && (
         <p class="window-supertitle">{supertitle}</p>
       )}
@@ -75,6 +76,10 @@ const { title = "Side Project Saturday", windowTitle = "Side Project Saturday", 
   main {
     max-width: 560px;
     width: 100%;
+  }
+
+  main.wide {
+    max-width: none;
   }
 
   .window {

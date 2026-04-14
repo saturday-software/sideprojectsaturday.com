@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { isEventCancelled, setEventCancelled } from "@/lib/events";
 import { addRule, deleteRule, toggleRule, toggleEventOnly } from "@/lib/door";
 import { switchbotPress } from "@/lib/switchbot";
+import { deleteSubscriber } from "@/lib/subscribers";
 
 export const admin = {
   login: defineAction({
@@ -101,6 +102,21 @@ export const admin = {
       requireAdmin(context.cookies);
       await toggleEventOnly(env.DB, id);
       return { message: "Door rule updated" };
+    },
+  }),
+
+  deleteSubscriber: defineAction({
+    accept: "form",
+    input: z.object({
+      id: z.coerce.number().int(),
+    }),
+    handler: async ({ id }, context) => {
+      requireAdmin(context.cookies);
+      const deleted = await deleteSubscriber(env.DB, id);
+      if (!deleted) {
+        throw new ActionError({ code: "NOT_FOUND", message: "Subscriber not found" });
+      }
+      return { message: "Subscriber deleted" };
     },
   }),
 

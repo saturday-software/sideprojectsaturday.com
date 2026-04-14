@@ -150,6 +150,18 @@ export async function getSubscriberCount(
   };
 }
 
+export async function deleteSubscriber(
+  db: D1Database,
+  id: number
+): Promise<boolean> {
+  const result = await db
+    .prepare("DELETE FROM subscribers WHERE id = ?")
+    .bind(id)
+    .run();
+
+  return (result.meta?.changes ?? 0) > 0;
+}
+
 /** Delete pending subscribers whose verification expired. */
 export async function cleanupExpiredPending(
   db: D1Database,

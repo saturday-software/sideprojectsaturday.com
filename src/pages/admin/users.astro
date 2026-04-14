@@ -1,5 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import { actions } from "astro:actions";
 import { isAdmin } from "@/lib/auth";
 import { getSubscribers } from "@/lib/subscribers";
 import { env } from "cloudflare:workers";
@@ -9,19 +10,24 @@ if (!authenticated) {
   return Astro.redirect("/admin");
 }
 
+const deleteResult = Astro.getActionResult(actions.admin.deleteSubscriber);
+
 const PER_PAGE = 25;
 const page = Math.max(1, Number(Astro.url.searchParams.get("page")) || 1);
 const { subscribers, total } = await getSubscribers(env.DB, page, PER_PAGE);
 const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 ---
 
-<Layout title="Users — Side Project Saturday" windowTitle="Users">
+<Layout title="Users — Side Project Saturday" windowTitle="Users" wide>
   <div>
     <h1>Users</h1>
     <p style="margin-bottom: 12px;">
       {total} subscriber{total !== 1 && "s"}
       <a href="/admin" style="margin-left: 12px;">← admin</a>
     </p>
+
+    {deleteResult?.data && <div class="message success">{deleteResult.data.message}</div>}
+    {deleteResult?.error && <div class="message error">{deleteResult.error.message}</div>}
 
     {subscribers.length === 0 ? (
       <p>No subscribers yet.</p>
@@ -34,6 +40,7 @@ const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
             <th>Participant</th>
             <th>Signed up</th>
             <th>Verified</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -48,6 +55,14 @@ const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
               <td>{sub.is_participant ? "Yes" : "No"}</td>
               <td class="date-cell">{sub.created_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
               <td class="date-cell">{sub.verified_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
+              <td class="action-cell">
+                <form method="POST" action={actions.admin.deleteSubscriber}>
+                  <input type="hidden" name="id" value={sub.id} />
+                  <button type="submit" class="delete-btn" title="Delete subscriber" onclick="return confirm('Delete this subscriber?')">
+                    <img src="https://api.iconify.design/pixelarticons/trash.svg" alt="Delete" width="16" height="16" />
+                  </button>
+                </form>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -143,5 +158,31 @@ const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
     font-size: 12px;
     padding: 2px 8px;
     text-decoration: none;
+  }
+
+  .action-cell {
+    text-align: right;
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    opacity: 0.4;
+    display: flex;
+    align-items: center;
+  }
+
+  .delete-btn:hover {
+    opacity: 1;
+    background: none;
+  }
+
+  .delete-btn:active {
+    opacity: 1;
+    background: none;
   }
 </style>
