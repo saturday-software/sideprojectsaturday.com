@@ -16,6 +16,31 @@ import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/da
 import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
 import { getVerifiedSubscribers, getParticipants, cleanupExpiredPending } from "./lib/subscribers";
 
+async function sendInBccBatches(
+  env: Env,
+  recipients: { email: string }[],
+  template: { subject: string; html: string },
+  batchSize = 49,
+): Promise<void> {
+  for (let i = 0; i < recipients.length; i += batchSize) {
+    const batch = recipients.slice(i, i + batchSize);
+    const domain = env.FROM_EMAIL.split("@")[1];
+    await sendEmail(env.EMAIL, {
+      to: `noreply@${domain}`,
+      bcc: batch.map((r) => r.email),
+      replyTo: env.FROM_EMAIL,
+      subject: template.subject,
+      html: template.html,
+      from: env.FROM_EMAIL,
+      headers: {
+        "List-Id": `Side Project Saturday <list.${domain}>`,
+        "List-Unsubscribe": `<${env.SITE_URL}/unsubscribe>`,
+        "Precedence": "bulk",
+      },
+    }, env.MAILBOX_DO);
+  }
+}
+
 function getEventDO(env: Env, slug: string) {
   const id = env.EVENT_DO.idFromName(slug);
   return env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
@@ -80,15 +105,7 @@ export default {
             lastWeekKey,
           );
 
-      for (const sub of subscribers) {
-        const html = template.html.replace("%%EMAIL%%", encodeURIComponent(sub.email));
-        await sendEmail(env.EMAIL, {
-          to: sub.email,
-          subject: template.subject,
-          html,
-          from: env.FROM_EMAIL,
-        }, env.MAILBOX_DO);
-      }
+      await sendInBccBatches(env, subscribers, template);
     } else if (cron === "0 13 * * 5") {
       // Friday: reminder (if not cancelled)
       await ensureEvent(env.DB, saturdayKey);
@@ -98,15 +115,7 @@ export default {
       const subscribers = await getVerifiedSubscribers(env.DB);
       const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
-      for (const sub of subscribers) {
-        const html = template.html.replace("%%EMAIL%%", encodeURIComponent(sub.email));
-        await sendEmail(env.EMAIL, {
-          to: sub.email,
-          subject: template.subject,
-          html,
-          from: env.FROM_EMAIL,
-        }, env.MAILBOX_DO);
-      }
+      await sendInBccBatches(env, subscribers, template);
     } else if (cron === "0 16 * * SUN") {
       // Sunday: recap to participants only
       // On Sunday, yesterday was Saturday
@@ -129,15 +138,7 @@ export default {
       const participants = await getParticipants(env.DB);
       const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
 
-      for (const sub of participants) {
-        const html = template.html.replace("%%EMAIL%%", encodeURIComponent(sub.email));
-        await sendEmail(env.EMAIL, {
-          to: sub.email,
-          subject: template.subject,
-          html,
-          from: env.FROM_EMAIL,
-        }, env.MAILBOX_DO);
-      }
+      await sendInBccBatches(env, participants, template);
     }
   },
 };

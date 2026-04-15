@@ -1,24 +1,85 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { env } from "cloudflare:workers";
-import { unsubscribe } from "@/lib/subscribers";
+import { unsubscribe, generateUnsubscribeToken, verifyUnsubscribeToken } from "@/lib/subscribers";
+import { sendEmail } from "@/email/send";
+import { unsubscribeConfirmationEmail } from "@/email/templates";
 
-const email = Astro.url.searchParams.get("email");
-let success = false;
+const method = Astro.request.method;
+const url = Astro.url;
 
-if (email) {
-  const db = env.DB;
-  success = await unsubscribe(db, decodeURIComponent(email));
+type State =
+  | { kind: "form" }
+  | { kind: "sent" }
+  | { kind: "success" }
+  | { kind: "invalid" }
+  | { kind: "error" };
+
+let state: State = { kind: "form" };
+
+if (method === "POST") {
+  const formData = await Astro.request.formData();
+  const email = (formData.get("email") as string | null)?.trim();
+  if (email) {
+    const token = await generateUnsubscribeToken(email, env.UNSUBSCRIBE_SECRET);
+    const template = unsubscribeConfirmationEmail(env.SITE_URL, email, token);
+    await sendEmail(env.EMAIL, {
+      to: email,
+      subject: template.subject,
+      html: template.html,
+      from: env.FROM_EMAIL,
+    }, env.MAILBOX_DO);
+    state = { kind: "sent" };
+  }
+} else {
+  const email = url.searchParams.get("email");
+  const token = url.searchParams.get("token");
+  if (email && token) {
+    const valid = await verifyUnsubscribeToken(
+      decodeURIComponent(email),
+      decodeURIComponent(token),
+      env.UNSUBSCRIBE_SECRET,
+    );
+    if (valid) {
+      const ok = await unsubscribe(env.DB, decodeURIComponent(email));
+      state = ok ? { kind: "success" } : { kind: "error" };
+    } else {
+      state = { kind: "invalid" };
+    }
+  }
 }
 ---
 
 <Layout title="Unsubscribe — Side Project Saturday" windowTitle="Unsubscribe">
-  {success ? (
+  {state.kind === "form" && (
+    <div>
+      <h1>Unsubscribe</h1>
+      <p>Enter your email address and we'll send you a confirmation link.</p>
+      <form method="POST">
+        <input type="email" name="email" placeholder="you@example.com" required />
+        <button type="submit">Send unsubscribe link</button>
+      </form>
+    </div>
+  )}
+  {state.kind === "sent" && (
+    <div>
+      <h1>Check your email</h1>
+      <p>We sent you a confirmation link. Click it to complete your unsubscribe request.</p>
+    </div>
+  )}
+  {state.kind === "success" && (
     <div>
       <h1>Unsubscribed</h1>
       <p>You've been removed from the list. See you around.</p>
     </div>
-  ) : (
+  )}
+  {state.kind === "invalid" && (
+    <div>
+      <h1>Invalid link</h1>
+      <p>This unsubscribe link is invalid or has been tampered with.</p>
+    </div>
+  )}
+  {state.kind === "error" && (
     <div>
       <h1>Something went wrong</h1>
       <p>Couldn't process that. The email may not be in our system.</p>

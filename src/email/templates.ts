@@ -31,7 +31,24 @@ function layout(content: string): string {
 
 function footer(siteUrl: string): string {
   return `<hr style="border: none; border-top: 1px solid #000000; margin: 32px 0 16px;">
-<p><a href="${siteUrl}/unsubscribe?email=%%EMAIL%%" style="color: #000000;">Unsubscribe</a></p>`;
+<p><a href="${siteUrl}/unsubscribe" style="color: #000000;">Unsubscribe</a></p>`;
+}
+
+export function unsubscribeConfirmationEmail(
+  siteUrl: string,
+  email: string,
+  token: string,
+): { subject: string; html: string } {
+  const url = `${siteUrl}/unsubscribe?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
+  return {
+    subject: "Confirm your unsubscribe request",
+    html: layout(`
+      <h2>Unsubscribe</h2>
+      <p>Click the link below to unsubscribe from Side Project Saturday emails:</p>
+      <p><a href="${url}" style="display: inline-block; background-color: #ffffff; color: #000000; padding: 8px 20px; text-decoration: none; border: 2px solid #000000; border-radius: 1px; font-family: 'Courier New', Courier, monospace;">Confirm Unsubscribe</a></p>
+      <p style="color: #666;">If you didn't request this, you can ignore this email.</p>
+    `),
+  };
 }
 
 export function verificationEmail(
