@@ -1,0 +1,396 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import MarkdownEditor from "@/components/MarkdownEditor.astro";
+import { actions } from "astro:actions";
+import { isAdmin } from "@/lib/auth";
+import { env } from "cloudflare:workers";
+import type { MailboxDO, InboxMessage, InboxListItem, OutboxMessage, OutboxListItem } from "@/do/MailboxDO";
+
+const authenticated = isAdmin(Astro.request);
+if (!authenticated) {
+  return Astro.redirect("/admin");
+}
+
+const replyResult = Astro.getActionResult(actions.mailbox.reply);
+const markReadResult = Astro.getActionResult(actions.mailbox.markRead);
+const message = replyResult?.data?.message ?? markReadResult?.data?.message;
+const error = replyResult?.error?.message ?? markReadResult?.error?.message;
+
+const address = Astro.url.searchParams.get("address") || "hello";
+const tab = Astro.url.searchParams.get("tab") || "inbox";
+const inboxId = Astro.url.searchParams.get("inbox_id");
+const outboxId = Astro.url.searchParams.get("outbox_id");
+const page = Math.max(1, Number(Astro.url.searchParams.get("page")) || 1);
+
+const mbId = env.MAILBOX_DO.idFromName(address);
+const mb = env.MAILBOX_DO.get(mbId) as DurableObjectStub<MailboxDO>;
+
+let inboxDetail: InboxMessage | null = null;
+let outboxDetail: OutboxMessage | null = null;
+let inboxMessages: InboxListItem[] = [];
+let outboxMessages: OutboxListItem[] = [];
+let total = 0;
+
+if (inboxId) {
+  inboxDetail = await mb.getInboxMessage(Number(inboxId));
+  if (inboxDetail && !inboxDetail.is_read) {
+    await mb.markRead(inboxDetail.id);
+    inboxDetail.is_read = 1;
+  }
+} else if (outboxId) {
+  outboxDetail = await mb.getOutboxMessage(Number(outboxId));
+} else if (tab === "outbox") {
+  const result = await mb.getOutbox(page);
+  outboxMessages = result.messages;
+  total = result.total;
+} else {
+  const result = await mb.getInbox(page);
+  inboxMessages = result.messages;
+  total = result.total;
+}
+
+const unreadCount = await mb.getUnreadCount();
+const totalPages = Math.max(1, Math.ceil(total / 25));
+const detail = inboxDetail || outboxDetail;
+---
+
+<Layout title="Mailbox — Side Project Saturday" windowTitle={`Mailbox: ${address}@`} wide>
+  <div>
+    <p style="margin-bottom: 12px;">
+      {unreadCount > 0 && <strong>{unreadCount} unread</strong>}
+      {unreadCount === 0 && "No unread messages"}
+      <a href="/admin" style="margin-left: 12px;">← admin</a>
+    </p>
+
+    {message && <div class="message success">{message}</div>}
+    {error && <div class="message error">{error}</div>}
+
+    {detail ? (
+      <div class="detail">
+        <p style="margin-bottom: 8px;">
+          <a href={`/admin/mailbox?address=${address}&tab=${inboxDetail ? "inbox" : "outbox"}&page=${page}`}>← back to list</a>
+        </p>
+
+        <table class="meta-table">
+          <tr>
+            <td class="meta-label">From</td>
+            <td>{detail.from_address}</td>
+          </tr>
+          <tr>
+            <td class="meta-label">To</td>
+            <td>{detail.to_address}</td>
+          </tr>
+          <tr>
+            <td class="meta-label">Subject</td>
+            <td><strong>{detail.subject || "(no subject)"}</strong></td>
+          </tr>
+          <tr>
+            <td class="meta-label">Date</td>
+            <td>{detail.created_at}</td>
+          </tr>
+          {detail.message_id && (
+            <tr>
+              <td class="meta-label">Message-ID</td>
+              <td class="msg-id">{detail.message_id}</td>
+            </tr>
+          )}
+          {outboxDetail?.error && (
+            <tr>
+              <td class="meta-label">Error</td>
+              <td class="outbox-error">{outboxDetail.error}</td>
+            </tr>
+          )}
+        </table>
+
+        <div class="body-container">
+          {detail.body_html ? (
+            <iframe
+              class="body-frame"
+              srcdoc={detail.body_html}
+              sandbox=""
+            />
+          ) : (
+            <pre class="body-text">{(inboxDetail as InboxMessage)?.body_text || "(empty body)"}</pre>
+          )}
+        </div>
+
+        {inboxDetail && (
+          <details style="margin-top: 16px;">
+            <summary style="cursor: pointer;">Reply</summary>
+            <form method="POST" action={actions.mailbox.reply} class="reply-form">
+              <input type="hidden" name="address" value={address} />
+              <input type="hidden" name="inReplyTo" value={inboxDetail.message_id ?? ""} />
+              <label>
+                To
+                <input type="email" name="to" value={inboxDetail.from_address} required />
+              </label>
+              <label>
+                Subject
+                <input type="text" name="subject" value={`Re: ${inboxDetail.subject}`} required />
+              </label>
+              <MarkdownEditor name="markdown" id="reply-editor" label="Body" />
+              <button type="submit" class="btn" style="margin-top: 8px;">Send Reply</button>
+            </form>
+          </details>
+        )}
+      </div>
+    ) : (
+      <div>
+        <nav class="filter-tabs">
+          <a href={`/admin/mailbox?address=${address}&tab=inbox`} class:list={["tab", { active: tab === "inbox" }]}>Inbox</a>
+          <a href={`/admin/mailbox?address=${address}&tab=outbox`} class:list={["tab", { active: tab === "outbox" }]}>Outbox</a>
+        </nav>
+
+        {tab === "inbox" ? (
+          inboxMessages.length === 0 ? (
+            <p>No messages.</p>
+          ) : (
+            <table class="mailbox-table">
+              <thead>
+                <tr>
+                  <th>From</th>
+                  <th>Subject</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inboxMessages.map((msg) => (
+                  <tr class:list={{ unread: !msg.is_read }}>
+                    <td class="addr-cell">{msg.from_address}</td>
+                    <td>
+                      <a href={`/admin/mailbox?address=${address}&inbox_id=${msg.id}&page=${page}`}>
+                        {msg.subject || "(no subject)"}
+                      </a>
+                    </td>
+                    <td class="date-cell">{msg.created_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        ) : (
+          outboxMessages.length === 0 ? (
+            <p>No messages.</p>
+          ) : (
+            <table class="mailbox-table">
+              <thead>
+                <tr>
+                  <th>To</th>
+                  <th>Subject</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outboxMessages.map((msg) => (
+                  <tr class:list={{ "send-error": !!msg.error }}>
+                    <td class="addr-cell">{msg.to_address}</td>
+                    <td>
+                      <a href={`/admin/mailbox?address=${address}&outbox_id=${msg.id}&page=${page}`}>
+                        {msg.subject || "(no subject)"}
+                      </a>
+                    </td>
+                    <td>
+                      {msg.error ? (
+                        <span class="status-badge status-error" title={msg.error}>Failed</span>
+                      ) : (
+                        <span class="status-badge status-sent">Sent</span>
+                      )}
+                    </td>
+                    <td class="date-cell">{msg.created_at?.replace("T", " ").slice(0, 16) ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        )}
+
+        {totalPages > 1 && (
+          <nav class="pagination">
+            {page > 1 && (
+              <a href={`/admin/mailbox?address=${address}&tab=${tab}&page=${page - 1}`} class="btn btn-sm">← Prev</a>
+            )}
+            <span class="page-info">Page {page} of {totalPages}</span>
+            {page < totalPages && (
+              <a href={`/admin/mailbox?address=${address}&tab=${tab}&page=${page + 1}`} class="btn btn-sm">Next →</a>
+            )}
+          </nav>
+        )}
+      </div>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .filter-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 12px;
+    border-bottom: 2px solid #000;
+  }
+
+  .tab {
+    padding: 4px 12px;
+    text-decoration: none;
+    font-size: 13px;
+    border: 2px solid #000;
+    border-bottom: none;
+    margin-bottom: -2px;
+    background: #fff;
+    color: #000;
+  }
+
+  .tab.active {
+    background: #000;
+    color: #fff;
+  }
+
+  .mailbox-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .mailbox-table th,
+  .mailbox-table td {
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .mailbox-table th {
+    font-weight: bold;
+    border-bottom: 2px solid #000;
+    white-space: nowrap;
+  }
+
+  .mailbox-table tr.unread td {
+    font-weight: bold;
+  }
+
+  .mailbox-table tr.send-error td {
+    color: #c00;
+  }
+
+  .addr-cell {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .date-cell {
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .status-badge {
+    font-size: 11px;
+    padding: 1px 6px;
+    border: 1px solid #000;
+    white-space: nowrap;
+  }
+
+  .status-sent {
+    background: #000;
+    color: #fff;
+  }
+
+  .status-error {
+    background: #f00;
+    color: #fff;
+    border-color: #f00;
+  }
+
+  .outbox-error {
+    color: #c00;
+    font-size: 12px;
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .page-info {
+    font-size: 13px;
+  }
+
+  .btn-sm {
+    font-size: 12px;
+    padding: 2px 8px;
+    text-decoration: none;
+  }
+
+  .meta-table {
+    width: 100%;
+    font-size: 13px;
+    margin-bottom: 12px;
+    border-collapse: collapse;
+  }
+
+  .meta-table td {
+    padding: 2px 8px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .meta-label {
+    font-weight: bold;
+    white-space: nowrap;
+    width: 1%;
+  }
+
+  .msg-id {
+    font-size: 11px;
+    word-break: break-all;
+    color: #666;
+  }
+
+  .body-container {
+    border: 2px solid #000;
+    margin-top: 8px;
+  }
+
+  .body-frame {
+    width: 100%;
+    min-height: 300px;
+    border: none;
+    display: block;
+  }
+
+  .body-text {
+    padding: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 13px;
+    margin: 0;
+  }
+
+  .reply-form {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .reply-form label {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .reply-form input,
+  .reply-form textarea {
+    font-size: 13px;
+    padding: 4px 6px;
+    font-family: inherit;
+  }
+
+  .detail {
+    max-width: 800px;
+  }
+</style>
