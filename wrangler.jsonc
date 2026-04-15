@@ -16,12 +16,20 @@
         "name": "EVENT_DO",
         "class_name": "EventDO",
       },
+      {
+        "name": "MAILBOX_DO",
+        "class_name": "MailboxDO",
+      },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["EventDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["MailboxDO"],
     },
   ],
   "d1_databases": [
