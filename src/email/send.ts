@@ -1,26 +1,76 @@
-import { createMimeMessage } from "mimetext/browser";
 import { EmailMessage } from "cloudflare:email";
+import type { MailboxDO } from "@/do/MailboxDO";
 
 interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
+  text?: string;
   from: string;
+}
+
+function buildRawEmail(options: SendEmailOptions): string {
+  const boundary = `----=_Part_${Date.now()}`;
+  const parts: string[] = [
+    `From: Side Project Saturday <${options.from}>`,
+    `To: ${options.to}`,
+    `Subject: ${options.subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    ``,
+  ];
+
+  if (options.text) {
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=utf-8`,
+      `Content-Transfer-Encoding: quoted-printable`,
+      ``,
+      options.text,
+      ``,
+    );
+  }
+
+  parts.push(
+    `--${boundary}`,
+    `Content-Type: text/html; charset=utf-8`,
+    `Content-Transfer-Encoding: quoted-printable`,
+    ``,
+    options.html,
+    ``,
+    `--${boundary}--`,
+  );
+
+  return parts.join("\r\n");
 }
 
 export async function sendEmail(
   emailBinding: SendEmail,
-  options: SendEmailOptions
+  options: SendEmailOptions,
+  mailboxBinding?: DurableObjectNamespace<MailboxDO>,
 ): Promise<void> {
-  const msg = createMimeMessage();
-  msg.setSender({ addr: options.from, name: "Side Project Saturday" });
-  msg.setRecipient(options.to);
-  msg.setSubject(options.subject);
-  msg.addMessage({
-    contentType: "text/html",
-    data: options.html,
-  });
+  const raw = buildRawEmail(options);
+  const message = new EmailMessage(options.from, options.to, raw);
 
-  const message = new EmailMessage(options.from, options.to, msg.asRaw());
-  await emailBinding.send(message);
+  let error: string | undefined;
+  try {
+    await emailBinding.send(message);
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
+    if (!mailboxBinding) throw e;
+  }
+
+  if (mailboxBinding) {
+    const localPart = options.from.split("@")[0];
+    const id = mailboxBinding.idFromName(localPart);
+    const mailbox = mailboxBinding.get(id) as DurableObjectStub<MailboxDO>;
+    await mailbox.storeOutbound({
+      from: options.from,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      error,
+    });
+    if (error) throw new Error(error);
+  }
 }
