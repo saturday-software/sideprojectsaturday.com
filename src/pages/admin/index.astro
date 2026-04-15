@@ -7,6 +7,7 @@ import { ensureEvent, isEventCancelled } from "@/lib/events";
 import { generateShareCode } from "@/lib/share";
 import { getSubscriberCount } from "@/lib/subscribers";
 import { getRules, dayName, formatTime, type DoorRule } from "@/lib/door";
+import type { MailboxDO } from "@/do/MailboxDO";
 import { env } from "cloudflare:workers";
 
 const loginResult = Astro.getActionResult(actions.admin.login);
@@ -30,6 +31,7 @@ let events: { date: string; cancelled: boolean }[] = [];
 let shareCode = "";
 let subscriberCount = { total: 0, verified: 0 };
 let doorRules: DoorRule[] = [];
+let unreadCount = 0;
 
 if (authenticated) {
   const saturdays = getUpcomingSaturdays(WEEKS_AHEAD);
@@ -44,6 +46,10 @@ if (authenticated) {
   shareCode = await generateShareCode(env.SHARE_SEED, nextActive);
   subscriberCount = await getSubscriberCount(env.DB);
   doorRules = await getRules(env.DB);
+
+  const mbId = env.MAILBOX_DO.idFromName("hello");
+  const mb = env.MAILBOX_DO.get(mbId) as DurableObjectStub<MailboxDO>;
+  unreadCount = await mb.getUnreadCount();
 }
 ---
 
@@ -87,6 +93,16 @@ if (authenticated) {
       <section style="margin-bottom: 20px;">
         <h2>Subscribers</h2>
         <p>total: {subscriberCount.total} / verified: {subscriberCount.verified} · <a href="/admin/users">view all →</a></p>
+      </section>
+
+      <hr />
+
+      <section style="margin-bottom: 20px;">
+        <h2>Mailbox</h2>
+        <p>
+          {unreadCount > 0 ? <strong>{unreadCount} unread</strong> : "No unread messages"}
+          {" · "}<a href="/admin/mailbox">open mailbox →</a>
+        </p>
       </section>
 
       <hr />

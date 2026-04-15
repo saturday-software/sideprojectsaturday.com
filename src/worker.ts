@@ -1,7 +1,9 @@
 import { EventDO } from "./do/EventDO";
-export { EventDO };
+import { MailboxDO } from "./do/MailboxDO";
+export { EventDO, MailboxDO };
 
 import astroHandler from "@astrojs/cloudflare/entrypoints/server";
+import PostalMime from "postal-mime";
 
 import { sendEmail } from "./email/send";
 import {
@@ -22,6 +24,26 @@ function getEventDO(env: Env, slug: string) {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     return astroHandler.fetch(request, env, ctx);
+  },
+
+  async email(message: ForwardableEmailMessage, env: Env, _ctx: ExecutionContext) {
+    const localPart = message.to.split("@")[0];
+    const id = env.MAILBOX_DO.idFromName(localPart);
+    const mailbox = env.MAILBOX_DO.get(id) as DurableObjectStub<MailboxDO>;
+
+    const rawEmail = new Response(message.raw);
+    const arrayBuffer = await rawEmail.arrayBuffer();
+    const parsed = await PostalMime.parse(arrayBuffer);
+
+    await mailbox.storeInbound({
+      messageId: parsed.messageId,
+      from: message.from,
+      to: message.to,
+      subject: parsed.subject ?? "",
+      bodyHtml: parsed.html ?? "",
+      bodyText: parsed.text ?? "",
+      inReplyTo: parsed.inReplyTo,
+    });
   },
 
   async scheduled(
@@ -65,7 +87,7 @@ export default {
           subject: template.subject,
           html,
           from: env.FROM_EMAIL,
-        });
+        }, env.MAILBOX_DO);
       }
     } else if (cron === "0 13 * * 5") {
       // Friday: reminder (if not cancelled)
@@ -83,7 +105,7 @@ export default {
           subject: template.subject,
           html,
           from: env.FROM_EMAIL,
-        });
+        }, env.MAILBOX_DO);
       }
     } else if (cron === "0 16 * * SUN") {
       // Sunday: recap to participants only
@@ -114,7 +136,7 @@ export default {
           subject: template.subject,
           html,
           from: env.FROM_EMAIL,
-        });
+        }, env.MAILBOX_DO);
       }
     }
   },

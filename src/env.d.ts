@@ -8,5 +8,6 @@ declare namespace Cloudflare {
     SWITCHBOT_TOKEN: string;
     SWITCHBOT_KEY: string;
     SWITCHBOT_DEVICE_ID: string;
+    MAILBOX_DO: DurableObjectNamespace<import("./do/MailboxDO").MailboxDO>;
   }
 }
