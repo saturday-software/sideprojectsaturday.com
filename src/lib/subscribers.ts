@@ -162,6 +162,23 @@ export async function deleteSubscriber(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+export async function generateUnsubscribeToken(email: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(email));
+  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+}
+
+export async function verifyUnsubscribeToken(email: string, token: string, secret: string): Promise<boolean> {
+  const expected = await generateUnsubscribeToken(email, secret);
+  return expected === token;
+}
+
 /** Delete pending subscribers whose verification expired. */
 export async function cleanupExpiredPending(
   db: D1Database,

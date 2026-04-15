@@ -3,10 +3,13 @@ import type { MailboxDO } from "@/do/MailboxDO";
 
 interface SendEmailOptions {
   to: string;
+  bcc?: string[];
+  replyTo?: string;
   subject: string;
   html: string;
   text?: string;
   from: string;
+  headers?: Record<string, string>;
 }
 
 function buildRawEmail(options: SendEmailOptions): string {
@@ -14,6 +17,9 @@ function buildRawEmail(options: SendEmailOptions): string {
   const parts: string[] = [
     `From: Side Project Saturday <${options.from}>`,
     `To: ${options.to}`,
+    ...(options.bcc && options.bcc.length > 0 ? [`BCC: ${options.bcc.join(", ")}`] : []),
+    ...(options.replyTo ? [`Reply-To: ${options.replyTo}`] : []),
+    ...Object.entries(options.headers ?? {}).map(([k, v]) => `${k}: ${v}`),
     `Subject: ${options.subject}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
