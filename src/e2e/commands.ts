@@ -26,8 +26,9 @@ export const submitSubscription: BrowserCommand<
 };
 
 /**
- * Poll the dev server log for a send_email line containing a .eml path,
- * then read and return the raw email content.
+ * Poll the dev server log for a send_email line referencing the HTML body
+ * file that miniflare writes for the builder-form send(), then read and
+ * return its contents (already decoded — no MIME wrapping for this form).
  */
 export const waitForSentEmail: BrowserCommand<
   [timeoutMs?: number]
@@ -37,30 +38,25 @@ export const waitForSentEmail: BrowserCommand<
   while (Date.now() < deadline) {
     try {
       const log = readFileSync(DEV_LOG_PATH, "utf-8");
-      // Wrangler logs: [wrangler:inf] send_email binding called with the following message:
-      //   /tmp/miniflare-files/email/test-email-abc123.eml
-      const emlMatch = log.match(/(\S+\.eml)/);
-      if (emlMatch) {
-        const emlPath = emlMatch[1];
-        const content = readFileSync(emlPath, "utf-8");
-        return content;
+      const match = log.match(/(\S+\.html)/);
+      if (match) {
+        return readFileSync(match[1], "utf-8");
       }
     } catch {
-      // Log file might not exist yet or eml not written yet
+      // Log file might not exist yet or body not written yet
     }
 
     await new Promise((r) => setTimeout(r, 500));
   }
 
-  // If no .eml found, dump the log so we can see what wrangler printed
   try {
     const log = readFileSync(DEV_LOG_PATH, "utf-8");
     throw new Error(
-      `No .eml file found in dev server output within ${timeoutMs}ms.\nDev log tail:\n${log.slice(-2000)}`,
+      `No email body file found in dev server output within ${timeoutMs}ms.\nDev log tail:\n${log.slice(-2000)}`,
     );
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith("No .eml")) throw err;
-    throw new Error(`No .eml file found and could not read dev log`);
+    if (err instanceof Error && err.message.startsWith("No email")) throw err;
+    throw new Error(`No email body file found and could not read dev log`);
   }
 };
 
