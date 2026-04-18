@@ -34,11 +34,15 @@ function footer(siteUrl: string): string {
 <p><a href="${siteUrl}/unsubscribe" style="color: #000000;">Unsubscribe</a></p>`;
 }
 
+function textFooter(siteUrl: string): string {
+  return `\n--\nUnsubscribe: ${siteUrl}/unsubscribe`;
+}
+
 export function unsubscribeConfirmationEmail(
   siteUrl: string,
   email: string,
   token: string,
-): { subject: string; html: string } {
+): { subject: string; html: string; text: string } {
   const url = `${siteUrl}/unsubscribe?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
   return {
     subject: "Confirm your unsubscribe request",
@@ -48,22 +52,35 @@ export function unsubscribeConfirmationEmail(
       <p><a href="${url}" style="display: inline-block; background-color: #ffffff; color: #000000; padding: 8px 20px; text-decoration: none; border: 2px solid #000000; border-radius: 1px; font-family: 'Courier New', Courier, monospace;">Confirm Unsubscribe</a></p>
       <p style="color: #666;">If you didn't request this, you can ignore this email.</p>
     `),
+    text: `Unsubscribe from Side Project Saturday
+
+Click the link below to confirm your unsubscribe request:
+${url}
+
+If you didn't request this, you can ignore this email.`,
   };
 }
 
 export function verificationEmail(
   siteUrl: string,
   token: string,
-): { subject: string; html: string } {
+): { subject: string; html: string; text: string } {
+  const url = `${siteUrl}/verify?token=${token}`;
   return {
     subject: "Confirm your subscription to Side Project Saturday",
     html: layout(`
       <h2>Welcome!</h2>
       <p>Click the link below to confirm your subscription:</p>
-      <p><a href="${siteUrl}/verify?token=${token}" style="display: inline-block; background-color: #ffffff; color: #000000; padding: 8px 20px; text-decoration: none; border: 2px solid #000000; border-radius: 1px; font-family: 'Courier New', Courier, monospace;">Confirm Email</a></p>
+      <p><a href="${url}" style="display: inline-block; background-color: #ffffff; color: #000000; padding: 8px 20px; text-decoration: none; border: 2px solid #000000; border-radius: 1px; font-family: 'Courier New', Courier, monospace;">Confirm Email</a></p>
       <p style="color: #666;">If you didn't sign up, you can ignore this email.</p>
       ${footer(siteUrl)}
     `),
+    text: `Welcome to Side Project Saturday!
+
+Click the link below to confirm your subscription:
+${url}
+
+If you didn't sign up, you can ignore this email.${textFooter(siteUrl)}`,
   };
 }
 
@@ -73,11 +90,12 @@ export function wednesdayAnnouncement(
   siteUrl: string,
   lastWeekSubmissions: PublicSubmission[],
   lastWeekDate: string,
-): { subject: string; html: string } {
+): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
   const calLink = getCalendarLink(dateKey, address);
 
   let recapSection = "";
+  let recapText = "";
   if (lastWeekSubmissions.length > 0) {
     const items = lastWeekSubmissions
       .map(
@@ -90,6 +108,10 @@ export function wednesdayAnnouncement(
       <ul>${items}</ul>
       <p><a href="${siteUrl}/events/${dateKeyToSlug(lastWeekDate)}" style="color: #000000;">View full recap →</a></p>
     `;
+    const textItems = lastWeekSubmissions
+      .map((s) => `- ${s.participant_name}${s.description ? `: ${s.description}` : ""}`)
+      .join("\n");
+    recapText = `\nLast Week's Projects:\n${textItems}\nFull recap: ${siteUrl}/events/${dateKeyToSlug(lastWeekDate)}\n`;
   }
 
   return {
@@ -103,13 +125,22 @@ export function wednesdayAnnouncement(
       ${recapSection}
       ${footer(siteUrl)}
     `),
+    text: `Side Project Saturday
+
+${eventDate}
+${address}
+
+Add to Calendar: ${calLink}
+
+Come work on your side projects and share what you've been building!
+${recapText}${textFooter(siteUrl)}`,
   };
 }
 
 export function wednesdayCancellation(
   dateKey: string,
   siteUrl: string,
-): { subject: string; html: string } {
+): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
   return {
     subject: "Side Project Saturday is cancelled this week",
@@ -119,6 +150,11 @@ export function wednesdayCancellation(
       <p>We'll be back next week!</p>
       ${footer(siteUrl)}
     `),
+    text: `Side Project Saturday
+
+${eventDate} has been cancelled.
+
+We'll be back next week!${textFooter(siteUrl)}`,
   };
 }
 
@@ -126,7 +162,7 @@ export function fridayReminder(
   dateKey: string,
   address: string,
   siteUrl: string,
-): { subject: string; html: string } {
+): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
   const calLink = getCalendarLink(dateKey, address);
 
@@ -139,6 +175,12 @@ export function fridayReminder(
       <p><a href="${calLink}" style="color: #000000;">Add to Calendar</a></p>
       ${footer(siteUrl)}
     `),
+    text: `Side Project Saturday is tomorrow!
+
+${eventDate}
+${address}
+
+Add to Calendar: ${calLink}${textFooter(siteUrl)}`,
   };
 }
 
@@ -147,7 +189,7 @@ export function sundayRecap(
   submissions: Submission[],
   imageKey: string | null,
   siteUrl: string,
-): { subject: string; html: string } {
+): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
 
   let imageSection = "";
@@ -168,6 +210,17 @@ export function sundayRecap(
     )
     .join("\n");
 
+  const textItems =
+    submissions.length > 0
+      ? submissions
+          .map((s) => {
+            let entry = `- ${s.participant_name}: ${s.description}`;
+            if (s.contact_info) entry += `\n  Contact: ${s.contact_info}`;
+            return entry;
+          })
+          .join("\n")
+      : "No projects were submitted this week.";
+
   return {
     subject: "Side Project Saturday recap",
     html: layout(`
@@ -177,5 +230,10 @@ export function sundayRecap(
       ${submissions.length > 0 ? items : "<p>No projects were submitted this week.</p>"}
       ${footer(siteUrl)}
     `),
+    text: `Side Project Saturday Recap
+
+${eventDate}
+
+${textItems}${textFooter(siteUrl)}`,
   };
 }
