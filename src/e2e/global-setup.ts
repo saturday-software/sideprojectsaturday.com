@@ -11,7 +11,7 @@ export const DEV_LOG_PATH = join(process.cwd(), ".wrangler", "e2e-dev.log");
 /** Check if a port is already listening. */
 function isPortOpen(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = createConnection({ port, host: "127.0.0.1" });
+    const socket = createConnection({ port, host: "localhost" });
     socket.on("connect", () => {
       socket.destroy();
       resolve(true);
