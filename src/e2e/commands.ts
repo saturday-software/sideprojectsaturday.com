@@ -1,8 +1,12 @@
 import type { BrowserCommand } from "vitest/node";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { DEV_LOG_PATH as DEV_LOG_RELATIVE } from "./constants.js";
 
-const DEV_LOG_PATH = join(process.cwd(), ".wrangler", "e2e-dev.log");
+const DEV_LOG_PATH = join(process.cwd(), DEV_LOG_RELATIVE);
+
+/** Byte offset past the last matched email — prevents stale matches on repeat calls. */
+let lastEmailOffset = 0;
 
 /**
  * Open a new browser page, navigate to the homepage,
@@ -12,6 +16,13 @@ const DEV_LOG_PATH = join(process.cwd(), ".wrangler", "e2e-dev.log");
 export const submitSubscription: BrowserCommand<
   [url: string, email: string]
 > = async (ctx, url, email) => {
+  // Record current log size so waitForSentEmail only scans new output
+  try {
+    lastEmailOffset = statSync(DEV_LOG_PATH).size;
+  } catch {
+    lastEmailOffset = 0;
+  }
+
   const page = await ctx.context.newPage();
   try {
     await page.goto(url, { timeout: 15_000, waitUntil: "networkidle" });
@@ -37,8 +48,8 @@ export const waitForSentEmail: BrowserCommand<
 
   while (Date.now() < deadline) {
     try {
-      const log = readFileSync(DEV_LOG_PATH, "utf-8");
-      const match = log.match(/(\S+\.html)/);
+      const log = readFileSync(DEV_LOG_PATH, "utf-8").slice(lastEmailOffset);
+      const match = log.match(/^HTML:\s*(\S+\.html)/m);
       if (match) {
         return readFileSync(match[1], "utf-8");
       }

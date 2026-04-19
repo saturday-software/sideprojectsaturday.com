@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 import { parseArgs } from "util";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import { spawn } from "child_process";
 import { select, text, intro, outro, isCancel, cancel } from "@clack/prompts";
 import {
   verificationEmail,
@@ -22,7 +24,7 @@ const TEMPLATES = [
 type Template = (typeof TEMPLATES)[number];
 
 const { values, positionals } = parseArgs({
-  args: Bun.argv.slice(2),
+  args: process.argv.slice(2),
   options: {
     to: { type: "string" },
     date: { type: "string" },
@@ -53,7 +55,7 @@ if (values.to) {
 } else {
   const result = await text({
     message: "Recipient email address",
-    validate: (v) => (v.includes("@") ? undefined : "Must be a valid email"),
+    validate: (v) => (v?.includes("@") ? undefined : "Must be a valid email"),
   });
   if (isCancel(result)) {
     cancel("Cancelled");
@@ -87,9 +89,9 @@ async function generate(): Promise<{ subject: string; html: string }> {
 
     case "sunday-recap":
       return sundayRecap(dateKey, [
-        { participant_name: "Alice", description: "Built a weather CLI in Rust", contact_info: "@alice", private_details: "" },
-        { participant_name: "Bob", description: "Designed a logo for my podcast", contact_info: "", private_details: "Looking for a co-founder" },
-        { participant_name: "Charlie", description: "Shipped v1 of my budgeting app", contact_info: "charlie@example.com", private_details: "" },
+        { id: 1, email: "alice@example.com", participant_name: "Alice", description: "Built a weather CLI in Rust", contact_info: "@alice", private_details: "", submitted_at: new Date().toISOString() },
+        { id: 2, email: "bob@example.com", participant_name: "Bob", description: "Designed a logo for my podcast", contact_info: "", private_details: "Looking for a co-founder", submitted_at: new Date().toISOString() },
+        { id: 3, email: "charlie@example.com", participant_name: "Charlie", description: "Shipped v1 of my budgeting app", contact_info: "charlie@example.com", private_details: "", submitted_at: new Date().toISOString() },
       ], null, siteUrl);
   }
 }
@@ -97,27 +99,28 @@ async function generate(): Promise<{ subject: string; html: string }> {
 const { subject, html } = await generate();
 const rendered = html.replace("%%EMAIL%%", encodeURIComponent(to));
 
-const wrangler = resolve(import.meta.dir, "../node_modules/.bin/wrangler");
-const configFile = resolve(import.meta.dir, "../wrangler.jsonc");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const wrangler = resolve(__dirname, "../node_modules/.bin/wrangler");
+const configFile = resolve(__dirname, "../wrangler.jsonc");
 
 console.log(`\nSending "${subject}" to ${to}...`);
 
-const proc = Bun.spawn(
-  [wrangler, "email", "sending", "send",
-    "--config", configFile,
-    "--from", from,
-    "--from-name", "Side Project Saturday",
-    "--to", to,
-    "--subject", subject,
-    "--html", rendered,
-  ],
-  { stdio: ["inherit", "inherit", "inherit"] }
+const proc = spawn(wrangler, [
+  "email", "sending", "send",
+  "--config", configFile,
+  "--from", from,
+  "--from-name", "Side Project Saturday",
+  "--to", to,
+  "--subject", subject,
+  "--html", rendered,
+], { stdio: "inherit" });
+
+const exitCode = await new Promise<number>((res) =>
+  proc.on("close", (code) => res(code ?? 1)),
 );
 
-await proc.exited;
-
-if (proc.exitCode === 0) {
+if (exitCode === 0) {
   outro("Email sent!");
 } else {
-  process.exit(proc.exitCode ?? 1);
+  process.exit(exitCode);
 }

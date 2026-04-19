@@ -2,11 +2,11 @@ import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createConnection } from "node:net";
 import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { DEV_PORT, DEV_LOG_PATH as DEV_LOG_RELATIVE } from "./constants.js";
 
 let devServer: ChildProcess | undefined;
 
-/** Path where we stream the dev server's combined stdout/stderr. */
-export const DEV_LOG_PATH = join(process.cwd(), ".wrangler", "e2e-dev.log");
+const DEV_LOG_PATH = join(process.cwd(), DEV_LOG_RELATIVE);
 
 /** Check if a port is already listening. */
 function isPortOpen(port: number): Promise<boolean> {
@@ -23,14 +23,14 @@ function isPortOpen(port: number): Promise<boolean> {
 export async function setup() {
   // If the port is already in use, skip starting (e.g. CI starts the server
   // externally, or a previous globalSetup invocation already started it).
-  if (await isPortOpen(4322)) {
-    console.log("[e2e] Dev server already running on port 4322");
+  if (await isPortOpen(DEV_PORT)) {
+    console.log(`[e2e] Dev server already running on port ${DEV_PORT}`);
     return;
   }
 
   // Apply database schema to the local D1 database
   console.log("[e2e] Applying D1 schema...");
-  execSync("npx wrangler d1 execute sps --local --file=src/db/schema.sql", {
+  execSync("bunx wrangler d1 execute sps --local --file=src/db/schema.sql", {
     cwd: process.cwd(),
     stdio: "pipe",
   });
@@ -43,7 +43,7 @@ export async function setup() {
 
   devServer = spawn(
     "node",
-    ["./node_modules/.bin/astro", "dev", "--port", "4322"],
+    ["./node_modules/.bin/astro", "dev", "--port", String(DEV_PORT)],
     {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
@@ -52,7 +52,7 @@ export async function setup() {
     },
   );
 
-  // Pipe output to log file (used by waitForSentEmail to find .eml paths)
+  // Pipe output to log file (used by waitForSentEmail to find .html body paths)
   devServer.stdout?.on("data", (data: Buffer) => logStream.write(data));
   devServer.stderr?.on("data", (data: Buffer) => logStream.write(data));
 
@@ -60,7 +60,7 @@ export async function setup() {
   // so the "localhost:4322" line can be delayed by 20+ seconds.
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
-    if (await isPortOpen(4322)) {
+    if (await isPortOpen(DEV_PORT)) {
       console.log("[e2e] Dev server ready");
       return;
     }
