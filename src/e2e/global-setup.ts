@@ -1,6 +1,6 @@
 import { spawn, execSync, type ChildProcess } from "node:child_process";
 import { createConnection } from "node:net";
-import { createWriteStream, mkdirSync } from "node:fs";
+import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 let devServer: ChildProcess | undefined;
@@ -66,7 +66,13 @@ export async function setup() {
     }
     // Check if the process died
     if (devServer.exitCode !== null) {
-      throw new Error(`Dev server exited with code ${devServer.exitCode}`);
+      let log = "";
+      try {
+        log = readFileSync(DEV_LOG_PATH, "utf-8");
+      } catch {}
+      throw new Error(
+        `Dev server exited with code ${devServer.exitCode}\n--- dev server output ---\n${log}`,
+      );
     }
     await new Promise((r) => setTimeout(r, 200));
   }
