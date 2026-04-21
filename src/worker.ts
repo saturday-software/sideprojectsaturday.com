@@ -79,66 +79,79 @@ export default {
     const cron = controller.cron;
     const now = new Date();
     const saturdayKey = getCurrentSaturday(now);
+    console.log(`[scheduled] enter cron="${cron}" saturdayKey="${saturdayKey}"`);
 
-    // Clean up unverified subscribers on every cron run
-    await cleanupExpiredPending(env.DB);
+    try {
+      // Clean up unverified subscribers on every cron run
+      await cleanupExpiredPending(env.DB);
 
-    if (cron === "0 13 * * 3") {
-      // Wednesday: announcement or cancellation
-      await ensureEvent(env.DB, saturdayKey);
-      const cancelled = await isEventCancelled(env.DB, saturdayKey);
+      if (cron === "0 13 * * 3") {
+        // Wednesday: announcement or cancellation
+        await ensureEvent(env.DB, saturdayKey);
+        const cancelled = await isEventCancelled(env.DB, saturdayKey);
 
-      const lastWeekKey = getPreviousSaturday(saturdayKey);
-      const lastWeekSlug = dateKeyToSlug(lastWeekKey);
-      const lastWeekStub = getEventDO(env, lastWeekSlug);
-      const lastWeekSubmissions = await lastWeekStub.getPublicSubmissions();
+        const lastWeekKey = getPreviousSaturday(saturdayKey);
+        const lastWeekSlug = dateKeyToSlug(lastWeekKey);
+        const lastWeekStub = getEventDO(env, lastWeekSlug);
+        const lastWeekSubmissions = await lastWeekStub.getPublicSubmissions();
 
-      const subscribers = await getVerifiedSubscribers(env.DB);
+        const subscribers = await getVerifiedSubscribers(env.DB);
 
-      const template = cancelled
-        ? wednesdayCancellation(saturdayKey, env.SITE_URL)
-        : wednesdayAnnouncement(
-            saturdayKey,
-            env.EVENT_ADDRESS,
-            env.SITE_URL,
-            lastWeekSubmissions,
-            lastWeekKey,
-          );
+        const template = cancelled
+          ? wednesdayCancellation(saturdayKey, env.SITE_URL)
+          : wednesdayAnnouncement(
+              saturdayKey,
+              env.EVENT_ADDRESS,
+              env.SITE_URL,
+              lastWeekSubmissions,
+              lastWeekKey,
+            );
 
-      await sendInBccBatches(env, subscribers, template);
-    } else if (cron === "0 13 * * 5") {
-      // Friday: reminder (if not cancelled)
-      await ensureEvent(env.DB, saturdayKey);
-      const cancelled = await isEventCancelled(env.DB, saturdayKey);
-      if (cancelled) return;
-
-      const subscribers = await getVerifiedSubscribers(env.DB);
-      const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
-
-      await sendInBccBatches(env, subscribers, template);
-    } else if (cron === "0 16 * * SUN") {
-      // Sunday: recap to participants only
-      // On Sunday, yesterday was Saturday
-      const recapKey = (() => {
-        const day = now.getUTCDay();
-        if (day === 0) {
-          const sat = new Date(now);
-          sat.setUTCDate(sat.getUTCDate() - 1);
-          return sat.toISOString().slice(0, 10);
+        await sendInBccBatches(env, subscribers, template);
+      } else if (cron === "0 13 * * 5") {
+        // Friday: reminder (if not cancelled)
+        await ensureEvent(env.DB, saturdayKey);
+        const cancelled = await isEventCancelled(env.DB, saturdayKey);
+        if (cancelled) {
+          console.log(`[scheduled] ok cron="${cron}" reason=cancelled`);
+          return;
         }
-        return saturdayKey;
-      })();
-      const recapSlug = dateKeyToSlug(recapKey);
 
-      const stub = getEventDO(env, recapSlug);
-      const submissions = await stub.getSubmissions();
-      const imageKey = eventImageKey(recapSlug);
-      const hasImage = await env.IMAGES_BUCKET.head(imageKey) !== null;
+        const subscribers = await getVerifiedSubscribers(env.DB);
+        const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
-      const participants = await getParticipants(env.DB);
-      const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
+        await sendInBccBatches(env, subscribers, template);
+      } else if (cron === "0 16 * * SUN") {
+        // Sunday: recap to participants only
+        // On Sunday, yesterday was Saturday
+        const recapKey = (() => {
+          const day = now.getUTCDay();
+          if (day === 0) {
+            const sat = new Date(now);
+            sat.setUTCDate(sat.getUTCDate() - 1);
+            return sat.toISOString().slice(0, 10);
+          }
+          return saturdayKey;
+        })();
+        const recapSlug = dateKeyToSlug(recapKey);
 
-      await sendInBccBatches(env, participants, template);
+        const stub = getEventDO(env, recapSlug);
+        const submissions = await stub.getSubmissions();
+        const imageKey = eventImageKey(recapSlug);
+        const hasImage = await env.IMAGES_BUCKET.head(imageKey) !== null;
+
+        const participants = await getParticipants(env.DB);
+        const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
+
+        await sendInBccBatches(env, participants, template);
+      }
+      console.log(`[scheduled] ok cron="${cron}"`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const stack = e instanceof Error ? e.stack : undefined;
+      console.error(`[scheduled] throw cron="${cron}" saturdayKey="${saturdayKey}" msg="${msg}"`);
+      if (stack) console.error(`[scheduled] stack:\n${stack}`);
+      throw e;
     }
   },
 };
