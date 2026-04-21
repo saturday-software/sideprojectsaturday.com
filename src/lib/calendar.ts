@@ -1,26 +1,27 @@
-/** Generate a base64-encoded ICS data URI for an "Add to Calendar" link. */
-export function getCalendarLink(dateKey: string, address: string): string {
+/** Build the raw ICS body for a Side Project Saturday event. */
+export function generateIcs(dateKey: string, address: string): string {
   const title = "Side Project Saturday";
-  // Event runs 9am–noon ET
-  const start = dateKey.replace(/-/g, "") + "T130000Z"; // 9am ET = 1pm UTC
-  const end = dateKey.replace(/-/g, "") + "T160000Z"; // noon ET = 4pm UTC
-  const now = start; // use event start as DTSTAMP
+  // Event runs 9am ET to noon ET (1pm UTC to 4pm UTC).
+  const start = dateKey.replace(/-/g, "") + "T130000Z";
+  const end = dateKey.replace(/-/g, "") + "T160000Z";
 
-  const ics = [
+  return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//SideProjectSaturday//EN",
     "BEGIN:VEVENT",
     `DTSTART:${start}`,
     `DTEND:${end}`,
-    `DTSTAMP:${now}`,
+    `DTSTAMP:${start}`,
     `SUMMARY:${title}`,
     `LOCATION:${address}`,
     "DESCRIPTION:Weekly meetup to work on side projects and share demos.",
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
+}
 
-  const base64 = btoa(ics);
-  return `data:text/calendar;base64,${base64}`;
+/** Hosted .ics link. Works in email clients that block data: URIs. */
+export function getIcsUrl(siteUrl: string, dateKey: string): string {
+  return `${siteUrl}/api/calendar/${dateKey}.ics`;
 }

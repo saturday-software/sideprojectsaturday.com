@@ -1,5 +1,5 @@
 import { formatEventDate, dateKeyToSlug } from "@/lib/dates";
-import { getCalendarLink } from "@/lib/calendar";
+import { getIcsUrl } from "@/lib/calendar";
 import type { PublicSubmission, Submission } from "@/do/EventDO";
 
 function layout(content: string): string {
@@ -92,7 +92,7 @@ export function wednesdayAnnouncement(
   lastWeekDate: string,
 ): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
-  const calLink = getCalendarLink(dateKey, address);
+  const calLink = getIcsUrl(siteUrl, dateKey);
 
   let recapSection = "";
   let recapText = "";
@@ -164,7 +164,7 @@ export function fridayReminder(
   siteUrl: string,
 ): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
-  const calLink = getCalendarLink(dateKey, address);
+  const calLink = getIcsUrl(siteUrl, dateKey);
 
   return {
     subject: "Side Project Saturday is tomorrow!",
