@@ -4,6 +4,8 @@ import {
   submitSubscription,
   waitForSentEmail,
   visitPage,
+  seedVerifiedSubscriber,
+  triggerCron,
 } from "./src/e2e/commands.js";
 
 export default defineConfig({
@@ -29,6 +31,8 @@ export default defineConfig({
         submitSubscription,
         waitForSentEmail,
         visitPage,
+        seedVerifiedSubscriber,
+        triggerCron,
       },
     },
     globalSetup: "./src/e2e/global-setup.ts",

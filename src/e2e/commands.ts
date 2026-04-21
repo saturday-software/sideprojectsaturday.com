@@ -1,7 +1,8 @@
 import type { BrowserCommand } from "vitest/node";
+import { execSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { DEV_LOG_PATH as DEV_LOG_RELATIVE } from "./constants.js";
+import { DEV_LOG_PATH as DEV_LOG_RELATIVE, DEV_PORT } from "./constants.js";
 
 const DEV_LOG_PATH = join(process.cwd(), DEV_LOG_RELATIVE);
 
@@ -48,9 +49,12 @@ export const waitForSentEmail: BrowserCommand<
 
   while (Date.now() < deadline) {
     try {
-      const log = readFileSync(DEV_LOG_PATH, "utf-8").slice(lastEmailOffset);
+      const fullLog = readFileSync(DEV_LOG_PATH, "utf-8");
+      const log = fullLog.slice(lastEmailOffset);
       const match = log.match(/^HTML:\s*(\S+\.html)/m);
       if (match) {
+        // Advance offset past this match so subsequent calls don't re-read it
+        lastEmailOffset += match.index! + match[0].length;
         return readFileSync(match[1], "utf-8");
       }
     } catch {
@@ -69,6 +73,42 @@ export const waitForSentEmail: BrowserCommand<
     if (err instanceof Error && err.message.startsWith("No email")) throw err;
     throw new Error(`No email body file found and could not read dev log`);
   }
+};
+
+/**
+ * Insert a verified subscriber directly into the local D1 database.
+ * Optionally mark them as a participant (needed for Sunday recap).
+ */
+export const seedVerifiedSubscriber: BrowserCommand<
+  [email: string, isParticipant?: boolean]
+> = async (_ctx, email, isParticipant = false) => {
+  const sql = `INSERT OR IGNORE INTO subscribers (email, status, is_participant, verified_at) VALUES ('${email}', 'verified', ${isParticipant ? 1 : 0}, datetime('now'))`;
+  execSync(`bunx wrangler d1 execute sps --local --command "${sql}"`, {
+    cwd: process.cwd(),
+    stdio: "pipe",
+  });
+};
+
+/**
+ * Trigger a cron schedule via the local dev server's scheduled handler.
+ * Resets the email log offset so waitForSentEmail only picks up new emails.
+ * Returns the HTTP status code.
+ */
+export const triggerCron: BrowserCommand<[cron: string]> = async (
+  _ctx,
+  cron,
+) => {
+  // Reset email offset so waitForSentEmail picks up only new emails
+  try {
+    lastEmailOffset = statSync(DEV_LOG_PATH).size;
+  } catch {
+    lastEmailOffset = 0;
+  }
+
+  const encoded = cron.replace(/ /g, "+");
+  const url = `http://localhost:${DEV_PORT}/cdn-cgi/handler/scheduled?cron=${encoded}`;
+  const res = await fetch(url);
+  return res.status;
 };
 
 /**
