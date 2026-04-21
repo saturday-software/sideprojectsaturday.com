@@ -15,13 +15,15 @@ import {
 import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
 import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
 import { getVerifiedSubscribers, getParticipants, cleanupExpiredPending } from "./lib/subscribers";
+import { generateIcs } from "./lib/calendar";
 
 async function sendInBccBatches(
   env: Env,
   recipients: { email: string }[],
   template: { subject: string; html: string },
-  batchSize = 49,
+  options: { attachments?: EmailAttachment[]; batchSize?: number } = {},
 ): Promise<void> {
+  const batchSize = options.batchSize ?? 49;
   for (let i = 0; i < recipients.length; i += batchSize) {
     const batch = recipients.slice(i, i + batchSize);
     const domain = env.FROM_EMAIL.split("@")[1];
@@ -37,8 +39,20 @@ async function sendInBccBatches(
         "List-Unsubscribe": `<${env.SITE_URL}/unsubscribe>`,
         "Precedence": "bulk",
       },
+      ...(options.attachments ? { attachments: options.attachments } : {}),
     }, env.MAILBOX_DO);
   }
+}
+
+/** Build an ICS attachment for a weekly event email. Gmail shows an inline
+ * "Add to calendar" card when an email includes a text/calendar attachment. */
+function icsAttachment(dateKey: string, address: string): EmailAttachment {
+  return {
+    disposition: "attachment",
+    filename: `side-project-saturday-${dateKey}.ics`,
+    type: "text/calendar; method=PUBLISH; charset=utf-8",
+    content: btoa(generateIcs(dateKey, address)),
+  };
 }
 
 function getEventDO(env: Env, slug: string) {
@@ -107,7 +121,8 @@ export default {
               lastWeekKey,
             );
 
-        await sendInBccBatches(env, subscribers, template);
+        const attachments = cancelled ? undefined : [icsAttachment(saturdayKey, env.EVENT_ADDRESS)];
+        await sendInBccBatches(env, subscribers, template, { attachments });
       } else if (cron === "0 13 * * 5") {
         // Friday: reminder (if not cancelled)
         await ensureEvent(env.DB, saturdayKey);
@@ -120,7 +135,9 @@ export default {
         const subscribers = await getVerifiedSubscribers(env.DB);
         const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
-        await sendInBccBatches(env, subscribers, template);
+        await sendInBccBatches(env, subscribers, template, {
+          attachments: [icsAttachment(saturdayKey, env.EVENT_ADDRESS)],
+        });
       } else if (cron === "0 16 * * SUN") {
         // Sunday: recap to participants only
         // On Sunday, yesterday was Saturday
