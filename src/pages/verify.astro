@@ -2,6 +2,8 @@
 import Layout from "@/layouts/Layout.astro";
 import { env } from "cloudflare:workers";
 import { verifySubscriber } from "@/lib/subscribers";
+import { getCurrentSaturday } from "@/lib/dates";
+import { getCalendarLink } from "@/lib/calendar";
 
 const token = Astro.url.searchParams.get("token");
 let success = false;
@@ -10,13 +12,32 @@ if (token) {
   const db = env.DB;
   success = await verifySubscriber(db, token);
 }
+
+const address = env.EVENT_ADDRESS;
+const nextSaturday = getCurrentSaturday();
+const calendarLink = getCalendarLink(nextSaturday, address);
 ---
 
 <Layout title="Verify Email — Side Project Saturday" windowTitle="Verify Email">
   {success ? (
     <div>
       <h1>You're in.</h1>
-      <p>Email verified. You'll get weekly updates about Side Project Saturday.</p>
+      <p>Email verified. See you Saturday.</p>
+
+      <hr />
+
+      <h2>The Details</h2>
+      <p>
+        Every Saturday, 9 AM – Noon<br />
+        {address}
+      </p>
+      <p>Bring a laptop, bring a project, build something.</p>
+
+      <a class="btn" href={calendarLink} download="side-project-saturday.ics">
+        Add to Calendar
+      </a>
+
+      <br />
       <a href="/" class="back-link">← back</a>
     </div>
   ) : (

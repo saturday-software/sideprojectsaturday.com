@@ -1,9 +1,9 @@
 /** Generate a base64-encoded ICS data URI for an "Add to Calendar" link. */
 export function getCalendarLink(dateKey: string, address: string): string {
   const title = "Side Project Saturday";
-  // Event runs 10am–2pm ET
-  const start = dateKey.replace(/-/g, "") + "T140000Z"; // 10am ET = 2pm UTC
-  const end = dateKey.replace(/-/g, "") + "T180000Z"; // 2pm ET = 6pm UTC
+  // Event runs 9am–noon ET
+  const start = dateKey.replace(/-/g, "") + "T130000Z"; // 9am ET = 1pm UTC
+  const end = dateKey.replace(/-/g, "") + "T160000Z"; // noon ET = 4pm UTC
   const now = start; // use event start as DTSTAMP
 
   const ics = [
