@@ -9,6 +9,13 @@
   },
   "observability": {
     "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+    },
+    "traces": {
+      "enabled": false,
+    },
   },
   "durable_objects": {
     "bindings": [
