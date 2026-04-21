@@ -46,12 +46,12 @@ export function getIcsUrl(siteUrl: string, dateKey: string): string {
 /** One-click "add to Google Calendar" link. */
 export function getGoogleCalendarUrl(dateKey: string, address: string): string {
   const { start, end } = eventTimes(dateKey);
+  // Build dates outside URLSearchParams so the `/` separator stays literal.
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: TITLE,
-    dates: `${start}/${end}`,
     details: DESCRIPTION,
     location: address,
   });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  return `https://calendar.google.com/calendar/render?${params.toString()}&dates=${start}/${end}`;
 }
