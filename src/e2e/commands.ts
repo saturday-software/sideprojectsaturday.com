@@ -66,8 +66,11 @@ export const waitForSentEmail: BrowserCommand<
 
   try {
     const log = readFileSync(DEV_LOG_PATH, "utf-8");
+    const slice = log.slice(lastEmailOffset);
     throw new Error(
-      `No email body file found in dev server output within ${timeoutMs}ms.\nDev log tail:\n${log.slice(-2000)}`,
+      `No email body file found in dev server output within ${timeoutMs}ms.\n` +
+      `lastEmailOffset=${lastEmailOffset} fullLogSize=${log.length} sliceLength=${slice.length}\n` +
+      `--- full log from lastEmailOffset ---\n${slice}\n--- end ---`,
     );
   } catch (err) {
     if (err instanceof Error && err.message.startsWith("No email")) throw err;
