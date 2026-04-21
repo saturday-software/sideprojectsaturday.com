@@ -1,5 +1,5 @@
 import { formatEventDate, dateKeyToSlug } from "@/lib/dates";
-import { getCalendarLink } from "./calendar";
+import { getCalendarLink } from "@/lib/calendar";
 import type { PublicSubmission, Submission } from "@/do/EventDO";
 
 function layout(content: string): string {
