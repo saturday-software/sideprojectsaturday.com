@@ -9,6 +9,7 @@ interface SendEmailOptions {
   text?: string;
   from: string;
   headers?: Record<string, string>;
+  attachments?: EmailAttachment[];
 }
 
 export async function sendEmail(
@@ -27,6 +28,9 @@ export async function sendEmail(
       subject: options.subject,
       html: options.html,
       ...(options.text ? { text: options.text } : {}),
+      ...(options.attachments && options.attachments.length > 0
+        ? { attachments: options.attachments }
+        : {}),
     });
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
