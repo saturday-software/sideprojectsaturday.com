@@ -12,6 +12,10 @@ export default defineConfig({
   test: {
     include: ["src/e2e/**/*.test.ts"],
     testTimeout: 60_000,
+    // E2E tests share a single dev server (and its D1 database + email log),
+    // so running test files in parallel causes emails and DB state to
+    // interleave between suites. Force serial execution.
+    fileParallelism: false,
     browser: {
       enabled: true,
       provider: playwright({
