@@ -14,7 +14,7 @@ export const GET: APIRoute = ({ params }) => {
   return new Response(ics, {
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `attachment; filename="side-project-saturday-${dateKey}.ics"`,
+      "Content-Disposition": `inline; filename="side-project-saturday-${dateKey}.ics"`,
       "Cache-Control": "public, max-age=3600",
     },
   });
