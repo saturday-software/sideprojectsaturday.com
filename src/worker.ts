@@ -85,7 +85,7 @@ export default {
       // Clean up unverified subscribers on every cron run
       await cleanupExpiredPending(env.DB);
 
-      if (cron === "0 13 * * 3") {
+      if (cron === "0 13 * * WED") {
         // Wednesday: announcement or cancellation
         await ensureEvent(env.DB, saturdayKey);
         const cancelled = await isEventCancelled(env.DB, saturdayKey);
@@ -108,7 +108,7 @@ export default {
             );
 
         await sendInBccBatches(env, subscribers, template);
-      } else if (cron === "0 13 * * 5") {
+      } else if (cron === "0 13 * * FRI") {
         // Friday: reminder (if not cancelled)
         await ensureEvent(env.DB, saturdayKey);
         const cancelled = await isEventCancelled(env.DB, saturdayKey);
