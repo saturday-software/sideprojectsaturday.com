@@ -97,9 +97,10 @@ export const seedVerifiedSubscriber: BrowserCommand<
  * Resets the email log offset so waitForSentEmail only picks up new emails.
  * Returns the HTTP status code.
  */
-export const triggerCron: BrowserCommand<[cron: string]> = async (
+export const triggerCron: BrowserCommand<[cron: string, timeMs?: number]> = async (
   _ctx,
   cron,
+  timeMs,
 ) => {
   // Reset email offset so waitForSentEmail picks up only new emails
   try {
@@ -109,7 +110,8 @@ export const triggerCron: BrowserCommand<[cron: string]> = async (
   }
 
   const encoded = cron.replace(/ /g, "+");
-  const url = `http://localhost:${DEV_PORT}/cdn-cgi/handler/scheduled?cron=${encoded}`;
+  const timeParam = timeMs !== undefined ? `&time=${Math.floor(timeMs / 1000)}` : "";
+  const url = `http://localhost:${DEV_PORT}/cdn-cgi/handler/scheduled?cron=${encoded}${timeParam}`;
   const res = await fetch(url);
   return res.status;
 };

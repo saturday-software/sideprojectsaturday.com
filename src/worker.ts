@@ -76,17 +76,16 @@ export default {
     env: Env,
     _ctx: ExecutionContext
   ): Promise<void> {
-    const cron = controller.cron;
-    const now = new Date();
-    const saturdayKey = getCurrentSaturday(now);
-    console.log(`[scheduled] enter cron="${cron}" saturdayKey="${saturdayKey}"`);
+    const now = new Date(controller.scheduledTime);
+    const utcDay = now.getUTCDay();
+    const utcHour = now.getUTCHours();
+    console.log(`[scheduled] enter cron="${controller.cron}" utcDay=${utcDay} utcHour=${utcHour}`);
 
     try {
-      // Clean up unverified subscribers on every cron run
       await cleanupExpiredPending(env.DB);
 
-      if (cron === "0 13 * * 3") {
-        // Wednesday: announcement or cancellation
+      if (utcDay === 3 && utcHour === 13) {
+        const saturdayKey = getCurrentSaturday(now);
         await ensureEvent(env.DB, saturdayKey);
         const cancelled = await isEventCancelled(env.DB, saturdayKey);
 
@@ -108,12 +107,12 @@ export default {
             );
 
         await sendInBccBatches(env, subscribers, template);
-      } else if (cron === "0 13 * * 5") {
-        // Friday: reminder (if not cancelled)
+      } else if (utcDay === 5 && utcHour === 13) {
+        const saturdayKey = getCurrentSaturday(now);
         await ensureEvent(env.DB, saturdayKey);
         const cancelled = await isEventCancelled(env.DB, saturdayKey);
         if (cancelled) {
-          console.log(`[scheduled] ok cron="${cron}" reason=cancelled`);
+          console.log(`[scheduled] ok utcDay=${utcDay} reason=cancelled`);
           return;
         }
 
@@ -121,18 +120,11 @@ export default {
         const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
         await sendInBccBatches(env, subscribers, template);
-      } else if (cron === "0 16 * * SUN") {
-        // Sunday: recap to participants only
-        // On Sunday, yesterday was Saturday
-        const recapKey = (() => {
-          const day = now.getUTCDay();
-          if (day === 0) {
-            const sat = new Date(now);
-            sat.setUTCDate(sat.getUTCDate() - 1);
-            return sat.toISOString().slice(0, 10);
-          }
-          return saturdayKey;
-        })();
+      } else if (utcDay === 0 && utcHour === 16) {
+        // Yesterday (UTC) was the Saturday event.
+        const sat = new Date(now);
+        sat.setUTCDate(sat.getUTCDate() - 1);
+        const recapKey = sat.toISOString().slice(0, 10);
         const recapSlug = dateKeyToSlug(recapKey);
 
         const stub = getEventDO(env, recapSlug);
@@ -144,12 +136,14 @@ export default {
         const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
 
         await sendInBccBatches(env, participants, template);
+      } else {
+        console.log(`[scheduled] noop utcDay=${utcDay} utcHour=${utcHour}`);
       }
-      console.log(`[scheduled] ok cron="${cron}"`);
+      console.log(`[scheduled] ok utcDay=${utcDay} utcHour=${utcHour}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const stack = e instanceof Error ? e.stack : undefined;
-      console.error(`[scheduled] throw cron="${cron}" saturdayKey="${saturdayKey}" msg="${msg}"`);
+      console.error(`[scheduled] throw utcDay=${utcDay} utcHour=${utcHour} msg="${msg}"`);
       if (stack) console.error(`[scheduled] stack:\n${stack}`);
       throw e;
     }
