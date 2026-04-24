@@ -3,7 +3,7 @@ import Layout from "@/layouts/Layout.astro";
 import { env } from "cloudflare:workers";
 import { verifySubscriber } from "@/lib/subscribers";
 import { getCurrentSaturday } from "@/lib/dates";
-import { getCalendarLink } from "@/lib/calendar";
+import { getIcsUrl } from "@/lib/calendar";
 
 const token = Astro.url.searchParams.get("token");
 let success = false;
@@ -15,7 +15,7 @@ if (token) {
 
 const address = env.EVENT_ADDRESS;
 const nextSaturday = getCurrentSaturday();
-const calendarLink = getCalendarLink(nextSaturday, address);
+const calendarLink = getIcsUrl(env.SITE_URL, nextSaturday);
 ---
 
 <Layout title="Verify Email — Side Project Saturday" windowTitle="Verify Email">
