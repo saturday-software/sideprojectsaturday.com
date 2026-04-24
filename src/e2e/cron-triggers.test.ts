@@ -17,7 +17,7 @@ describe("e2e: cron triggers", () => {
     const email = `cron-wed-${Date.now()}@example.com`;
     await commands.seedVerifiedSubscriber(email);
 
-    const status = await commands.triggerCron("0 13 * * 3");
+    const status = await commands.triggerCron("0 13 * * WED");
     expect(status).toBe(200);
 
     const emailBody = await commands.waitForSentEmail(15_000);
@@ -28,7 +28,7 @@ describe("e2e: cron triggers", () => {
     const email = `cron-fri-${Date.now()}@example.com`;
     await commands.seedVerifiedSubscriber(email);
 
-    const status = await commands.triggerCron("0 13 * * 5");
+    const status = await commands.triggerCron("0 13 * * FRI");
     expect(status).toBe(200);
 
     const emailBody = await commands.waitForSentEmail(15_000);
