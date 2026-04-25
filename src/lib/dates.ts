@@ -35,8 +35,8 @@ export function getCurrentSaturday(now: Date = new Date()): string {
   return addDays(base, 6 - weekday); // Mon–Fri → this Saturday
 }
 
-/** Get the next N Saturdays starting from the upcoming one. Skips today if the event has started (Saturday >= startHour ET). */
-export function getUpcomingSaturdays(count: number, startHour: number = 9, now: Date = new Date()): string[] {
+/** Get the next N Saturdays starting from the upcoming one. Skips today if the event has ended (Saturday >= startHour ET, default noon). */
+export function getUpcomingSaturdays(count: number, startHour: number = 12, now: Date = new Date()): string[] {
   const { y, m, d, weekday } = nyParts(now);
   const base = pad(y, m, d);
 
