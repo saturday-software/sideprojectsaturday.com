@@ -1,4 +1,4 @@
-import { getCurrentSaturday, isSubmissionOpen } from "./dates";
+import { todayDateKey, isSubmissionOpen } from "./dates";
 
 /**
  * Generate a short, human-typeable share code for a given Saturday date.
@@ -34,9 +34,9 @@ export async function resolveShareCode(
   seed: string,
   code: string
 ): Promise<string | null> {
-  const saturday = getCurrentSaturday();
-  if (!isSubmissionOpen(saturday)) return null;
-  const expected = await generateShareCode(seed, saturday);
+  const today = todayDateKey();
+  if (!isSubmissionOpen(today)) return null;
+  const expected = await generateShareCode(seed, today);
   if (code !== expected) return null;
-  return saturday;
+  return today;
 }

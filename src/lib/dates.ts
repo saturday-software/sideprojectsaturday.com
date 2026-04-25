@@ -113,10 +113,7 @@ export function isWithinEventHours(now: Date = new Date()): boolean {
   return hourNY >= 9 && hourNY < 12;
 }
 
-/** Check if submission window is open (before Sunday midnight ET for a given Saturday). */
+/** Check if submission window is open: only during the Saturday of the event in ET (closes at end of day Saturday). */
 export function isSubmissionOpen(saturdayKey: string, now: Date = new Date()): boolean {
-  // Compare current NY date to the deadline (end of Sunday)
-  const nowNY = now.toLocaleDateString("en-CA", { timeZone: TZ });
-  const sunday = addDays(saturdayKey, 1);
-  return nowNY <= sunday;
+  return isSaturday(saturdayKey) && todayDateKey(now) === saturdayKey;
 }
