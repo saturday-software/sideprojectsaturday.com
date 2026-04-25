@@ -183,6 +183,7 @@ export function fridayReminder(
       <p><strong>${eventDate}</strong></p>
       <p>${address}</p>
       ${calendarLinksHtml(siteUrl, dateKey, address)}
+      <p>You can <a href="${siteUrl}/buzz" style="color: #000000;">buzz yourself into the building</a> or press the buzzer for Val.town and I'll let you in.</p>
       ${footer(siteUrl)}
     `),
     text: `Side Project Saturday is tomorrow!
@@ -190,7 +191,9 @@ export function fridayReminder(
 ${eventDate}
 ${address}
 
-${calendarLinksText(siteUrl, dateKey, address)}${textFooter(siteUrl)}`,
+${calendarLinksText(siteUrl, dateKey, address)}
+
+You can buzz yourself into the building with ${siteUrl}/buzz or press the buzzer for Val.town and I'll let you in.${textFooter(siteUrl)}`,
   };
 }
 
