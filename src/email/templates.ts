@@ -5,7 +5,7 @@ import type { PublicSubmission, Submission } from "@/do/EventDO";
 function calendarLinksHtml(siteUrl: string, dateKey: string, address: string): string {
   const ics = getIcsUrl(siteUrl, dateKey);
   const google = getGoogleCalendarUrl(dateKey, address);
-  return `<p>Add to calendar: <a href="${ics}" style="color: #000000;">.ics</a> | <a href="${google}" style="color: #000000;">Google Calendar</a></p>`;
+  return `<p>Add to calendar: <a href="${google}" style="color: #000000;">Google Cal</a> | <a href="${ics}" style="color: #000000;">ics</a></p>`;
 }
 
 function calendarLinksText(siteUrl: string, dateKey: string, address: string): string {
