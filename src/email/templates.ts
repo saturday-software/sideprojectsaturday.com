@@ -215,16 +215,12 @@ export function sundayRecap(
   let participantsSection = "";
   let participantsText = "";
   if (submissions.length > 0) {
-    const names = submissions
-      .map((s) => `<li>${s.participant_name}</li>`)
-      .join("\n");
+    const names = submissions.map((s) => s.participant_name).join(", ");
     participantsSection = `
       <h3>Participants</h3>
-      <p style="color: #666; font-size: 12px; margin: 0 0 8px;">Only includes folks who chose to share they were here.</p>
-      <ul>${names}</ul>
+      <p>${names}</p>
     `;
-    const textNames = submissions.map((s) => `- ${s.participant_name}`).join("\n");
-    participantsText = `Participants (only folks who chose to share they were here):\n${textNames}\n`;
+    participantsText = `Participants:\n${names}\n`;
   }
 
   let projectsSection = "";
