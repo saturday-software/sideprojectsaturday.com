@@ -1,0 +1,174 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { actions } from "astro:actions";
+import { isAdmin } from "@/lib/auth";
+import { slugToDateKey, isSaturday, formatEventDate } from "@/lib/dates";
+import { env } from "cloudflare:workers";
+import type { EventDO } from "@/do/EventDO";
+
+const authenticated = isAdmin(Astro.request);
+if (!authenticated) {
+  return Astro.redirect("/admin");
+}
+
+const { slug } = Astro.params;
+if (!slug || !/^\d{6}$/.test(slug)) {
+  return new Response(null, { status: 404 });
+}
+
+const date = slugToDateKey(slug);
+if (!isSaturday(date)) {
+  return new Response(null, { status: 404 });
+}
+
+const id = env.EVENT_DO.idFromName(slug);
+const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+const submissions = await stub.getSubmissions();
+
+const addResult = Astro.getActionResult(actions.admin.addSubmission);
+const updateResult = Astro.getActionResult(actions.admin.updateSubmission);
+const deleteResult = Astro.getActionResult(actions.admin.deleteSubmission);
+const message = addResult?.data?.message ?? updateResult?.data?.message ?? deleteResult?.data?.message;
+const error = addResult?.error?.message ?? updateResult?.error?.message ?? deleteResult?.error?.message;
+
+const eventDate = formatEventDate(date);
+---
+
+<Layout title={`Event ${eventDate} — Admin`} windowTitle="Admin">
+  <div>
+    <h1>Submissions</h1>
+    <p style="margin-bottom: 12px;">
+      {eventDate} · {submissions.length} submission{submissions.length !== 1 && "s"}
+      <a href="/admin" style="margin-left: 12px;">← admin</a>
+      <a href={`/events/${slug}`} style="margin-left: 12px;">public page →</a>
+    </p>
+
+    {message && <div class="message success">{message}</div>}
+    {error && <div class="message error">{error}</div>}
+
+    <details style="margin-bottom: 16px;">
+      <summary style="cursor: pointer; font-size: 13px;">Add submission</summary>
+      <form method="POST" action={actions.admin.addSubmission} class="submission-form">
+        <input type="hidden" name="slug" value={slug} />
+        <label>
+          Name
+          <input type="text" name="participant_name" required autocomplete="off" />
+        </label>
+        <label>
+          Email
+          <input type="email" name="email" required autocomplete="off" />
+        </label>
+        <label>
+          Project summary
+          <textarea name="description" rows="3"></textarea>
+        </label>
+        <label>
+          Note for attendees
+          <textarea name="private_details" rows="3"></textarea>
+        </label>
+        <label>
+          Contact info
+          <input type="text" name="contact_info" autocomplete="off" />
+        </label>
+        <button type="submit" class="btn" style="margin-top: 8px;">Add</button>
+      </form>
+    </details>
+
+    {submissions.length === 0 ? (
+      <p>No submissions yet.</p>
+    ) : (
+      submissions.map((s) => (
+        <div class="submission-card">
+          <form method="POST" action={actions.admin.updateSubmission} class="submission-form">
+            <input type="hidden" name="slug" value={slug} />
+            <input type="hidden" name="id" value={s.id} />
+            <div class="meta">#{s.id} · submitted {s.submitted_at?.replace("T", " ").slice(0, 16) ?? "—"}</div>
+            <label>
+              Name
+              <input type="text" name="participant_name" value={s.participant_name} required autocomplete="off" />
+            </label>
+            <label>
+              Email
+              <input type="email" name="email" value={s.email} required autocomplete="off" />
+            </label>
+            <label>
+              Project summary
+              <textarea name="description" rows="3">{s.description}</textarea>
+            </label>
+            <label>
+              Note for attendees
+              <textarea name="private_details" rows="3">{s.private_details}</textarea>
+            </label>
+            <label>
+              Contact info
+              <input type="text" name="contact_info" value={s.contact_info} autocomplete="off" />
+            </label>
+            <div class="row-actions">
+              <button type="submit" class="btn" onclick="return confirm('Save changes to this submission?')">Save</button>
+            </div>
+          </form>
+          <form method="POST" action={actions.admin.deleteSubmission} class="delete-form">
+            <input type="hidden" name="slug" value={slug} />
+            <input type="hidden" name="id" value={s.id} />
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Delete this submission?')">Delete</button>
+          </form>
+        </div>
+      ))
+    )}
+  </div>
+</Layout>
+
+<style>
+  .submission-card {
+    border: 1px solid #000;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: #fff;
+  }
+
+  .submission-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .submission-form label {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    gap: 2px;
+  }
+
+  .submission-form input,
+  .submission-form textarea {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    padding: 4px 6px;
+    border: 1px solid #000;
+  }
+
+  .submission-form textarea {
+    resize: vertical;
+  }
+
+  .meta {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 4px;
+  }
+
+  .row-actions {
+    margin-top: 4px;
+  }
+
+  .delete-form {
+    margin-top: 8px;
+    text-align: right;
+  }
+
+  .btn-danger {
+    background: #fff;
+    color: #000;
+    border: 1px solid #000;
+  }
+</style>

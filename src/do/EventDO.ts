@@ -61,6 +61,40 @@ export class EventDO extends DurableObject<Env> {
       .toArray() as unknown as Submission[];
   }
 
+  async updateSubmission(
+    id: number,
+    data: {
+      participant_name: string;
+      email: string;
+      description?: string;
+      contact_info?: string;
+      private_details?: string;
+    }
+  ): Promise<boolean> {
+    this.ensureSchema();
+    const cursor = this.ctx.storage.sql.exec(
+      `UPDATE submissions
+         SET participant_name = ?, email = ?, description = ?, contact_info = ?, private_details = ?
+       WHERE id = ?`,
+      data.participant_name,
+      data.email,
+      data.description ?? "",
+      data.contact_info ?? "",
+      data.private_details ?? "",
+      id
+    );
+    return cursor.rowsWritten > 0;
+  }
+
+  async deleteSubmission(id: number): Promise<boolean> {
+    this.ensureSchema();
+    const cursor = this.ctx.storage.sql.exec(
+      `DELETE FROM submissions WHERE id = ?`,
+      id
+    );
+    return cursor.rowsWritten > 0;
+  }
+
   async getPublicSubmissions(): Promise<PublicSubmission[]> {
     this.ensureSchema();
     return this.ctx.storage.sql

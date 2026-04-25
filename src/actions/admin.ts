@@ -5,7 +5,21 @@ import { requireAdmin } from "@/lib/auth";
 import { isEventCancelled, setEventCancelled } from "@/lib/events";
 import { addRule, deleteRule, toggleRule, toggleEventOnly } from "@/lib/door";
 import { switchbotPress } from "@/lib/switchbot";
-import { deleteSubscriber } from "@/lib/subscribers";
+import { deleteSubscriber, markAsParticipant } from "@/lib/subscribers";
+import type { EventDO } from "@/do/EventDO";
+
+function getEventStub(slug: string) {
+  const id = env.EVENT_DO.idFromName(slug);
+  return env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
+}
+
+const submissionFields = {
+  participant_name: z.string().min(1, "Name is required"),
+  email: z.email("Valid email is required"),
+  description: z.string().optional(),
+  contact_info: z.string().optional(),
+  private_details: z.string().optional(),
+};
 
 export const admin = {
   login: defineAction({
@@ -126,6 +140,69 @@ export const admin = {
       requireAdmin(context.cookies);
       await switchbotPress(env.SWITCHBOT_DEVICE_ID, env.SWITCHBOT_TOKEN, env.SWITCHBOT_KEY);
       return { message: "Door opened!" };
+    },
+  }),
+
+  addSubmission: defineAction({
+    accept: "form",
+    input: z.object({
+      slug: z.string().regex(/^\d{6}$/, "Invalid event slug"),
+      ...submissionFields,
+    }),
+    handler: async (input, context) => {
+      requireAdmin(context.cookies);
+      const stub = getEventStub(input.slug);
+      const email = input.email.trim().toLowerCase();
+      await stub.submitProject({
+        participant_name: input.participant_name,
+        email,
+        description: input.description,
+        contact_info: input.contact_info,
+        private_details: input.private_details,
+      });
+      await markAsParticipant(env.DB, email);
+      return { message: "Submission added" };
+    },
+  }),
+
+  updateSubmission: defineAction({
+    accept: "form",
+    input: z.object({
+      slug: z.string().regex(/^\d{6}$/, "Invalid event slug"),
+      id: z.coerce.number().int(),
+      ...submissionFields,
+    }),
+    handler: async (input, context) => {
+      requireAdmin(context.cookies);
+      const stub = getEventStub(input.slug);
+      const updated = await stub.updateSubmission(input.id, {
+        participant_name: input.participant_name,
+        email: input.email.trim().toLowerCase(),
+        description: input.description,
+        contact_info: input.contact_info,
+        private_details: input.private_details,
+      });
+      if (!updated) {
+        throw new ActionError({ code: "NOT_FOUND", message: "Submission not found" });
+      }
+      return { message: "Submission updated" };
+    },
+  }),
+
+  deleteSubmission: defineAction({
+    accept: "form",
+    input: z.object({
+      slug: z.string().regex(/^\d{6}$/, "Invalid event slug"),
+      id: z.coerce.number().int(),
+    }),
+    handler: async (input, context) => {
+      requireAdmin(context.cookies);
+      const stub = getEventStub(input.slug);
+      const deleted = await stub.deleteSubmission(input.id);
+      if (!deleted) {
+        throw new ActionError({ code: "NOT_FOUND", message: "Submission not found" });
+      }
+      return { message: "Submission deleted" };
     },
   }),
 };
