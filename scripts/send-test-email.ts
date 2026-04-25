@@ -11,7 +11,8 @@ import {
   fridayReminder,
   sundayRecap,
 } from "@/email/templates";
-import { getCurrentSaturday } from "@/lib/dates";
+import { getCurrentSaturday, dateKeyToSlug } from "@/lib/dates";
+import { eventImageKey } from "@/lib/events";
 
 const TEMPLATES = [
   "verification",
@@ -93,7 +94,7 @@ async function generate(): Promise<{ subject: string; html: string }> {
         { id: 2, email: "bob@example.com", participant_name: "Bob", description: "Designed a logo for my podcast", contact_info: "", private_details: "Looking for a co-founder", submitted_at: new Date().toISOString() },
         { id: 3, email: "charlie@example.com", participant_name: "Charlie", description: "Shipped v1 of my budgeting app", contact_info: "charlie@example.com", private_details: "", submitted_at: new Date().toISOString() },
         { id: 4, email: "dana@example.com", participant_name: "Dana", description: "", contact_info: "", private_details: "", submitted_at: new Date().toISOString() },
-      ], null, siteUrl);
+      ], eventImageKey(dateKeyToSlug(dateKey)), siteUrl);
   }
 }
 
