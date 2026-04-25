@@ -11,6 +11,7 @@ export interface Submission {
 }
 
 export interface PublicSubmission {
+  id: number;
   participant_name: string;
   description: string;
 }
@@ -65,8 +66,17 @@ export class EventDO extends DurableObject<Env> {
     this.ensureSchema();
     return this.ctx.storage.sql
       .exec(
-        `SELECT participant_name, description FROM submissions ORDER BY submitted_at ASC`
+        `SELECT id, participant_name, description FROM submissions ORDER BY submitted_at ASC`
       )
       .toArray() as unknown as PublicSubmission[];
+  }
+
+  async deleteSubmission(id: number): Promise<boolean> {
+    this.ensureSchema();
+    const cursor = this.ctx.storage.sql.exec(
+      `DELETE FROM submissions WHERE id = ?`,
+      id,
+    );
+    return cursor.rowsWritten > 0;
   }
 }

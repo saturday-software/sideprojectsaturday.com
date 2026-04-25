@@ -8,7 +8,7 @@ import type { EventDO } from "@/do/EventDO";
 const today = getCurrentSaturday();
 const rows = await listPastEvents(env.DB, today);
 
-const pastEvents: { date: string; slug: string; submissions: number; hasImage: boolean }[] = [];
+const pastEvents: { date: string; slug: string; participants: number; projects: number; hasImage: boolean }[] = [];
 
 for (const row of rows) {
   if (row.cancelled) continue;
@@ -20,8 +20,9 @@ for (const row of rows) {
   const submissions = await stub.getPublicSubmissions();
   if (submissions.length === 0) continue;
 
+  const projects = submissions.filter((s) => s.description.trim() !== "").length;
   const hasImage = await env.IMAGES_BUCKET.head(eventImageKey(slug)) !== null;
-  pastEvents.push({ date: slugToDateKey(slug), slug, submissions: submissions.length, hasImage });
+  pastEvents.push({ date: slugToDateKey(slug), slug, participants: submissions.length, projects, hasImage });
 }
 ---
 
@@ -41,7 +42,10 @@ for (const row of rows) {
           )}
           <div>
             <p class="event-date">{formatEventDate(event.date)}</p>
-            <p class="event-meta">{event.submissions} project{event.submissions !== 1 ? "s" : ""}</p>
+            <p class="event-meta">
+              {event.participants} participant{event.participants !== 1 ? "s" : ""}
+              {event.projects > 0 && ` · ${event.projects} project${event.projects !== 1 ? "s" : ""}`}
+            </p>
           </div>
         </a>
       ))}
