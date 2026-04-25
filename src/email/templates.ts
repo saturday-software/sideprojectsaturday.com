@@ -204,35 +204,59 @@ export function sundayRecap(
   siteUrl: string,
 ): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
+  const eventUrl = `${siteUrl}/events/${dateKeyToSlug(dateKey)}`;
 
   let imageSection = "";
   if (imageKey) {
     imageSection = `<img src="${siteUrl}/api/image/${imageKey}" alt="Event photo" style="max-width: 100%; margin-bottom: 16px;">`;
   }
 
-  const items = submissions
-    .map(
-      (s) => `
-      <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #000000;">
-        <strong>${s.participant_name}</strong>
-        <p style="margin: 4px 0;">${s.description}</p>
-        ${s.contact_info ? `<p style="margin: 4px 0; color: #666;">Contact: ${s.contact_info}</p>` : ""}
-        ${s.private_details ? `<p style="margin: 0; color: #666; font-style: italic;">${s.private_details}</p>` : ""}
-      </div>
-    `,
-    )
-    .join("\n");
+  const projects = submissions.filter((s) => s.description.trim() !== "");
 
-  const textItems =
-    submissions.length > 0
-      ? submissions
-          .map((s) => {
-            let entry = `- ${s.participant_name}: ${s.description}`;
-            if (s.contact_info) entry += `\n  Contact: ${s.contact_info}`;
-            return entry;
-          })
-          .join("\n")
-      : "No projects were submitted this week.";
+  let participantsSection = "";
+  let participantsText = "";
+  if (submissions.length > 0) {
+    const names = submissions.map((s) => s.participant_name).join(", ");
+    participantsSection = `
+      <h3>Participants</h3>
+      <p>${names}</p>
+    `;
+    participantsText = `Participants:\n${names}\n`;
+  }
+
+  let projectsSection = "";
+  let projectsText = "";
+  if (projects.length > 0) {
+    const items = projects
+      .map(
+        (s) => `
+        <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #000000;">
+          <strong>${s.participant_name}</strong>
+          <p style="margin: 4px 0;">${s.description}</p>
+          ${s.contact_info ? `<p style="margin: 4px 0; color: #666;">Contact: ${s.contact_info}</p>` : ""}
+          ${s.private_details ? `<p style="margin: 0; color: #666; font-style: italic;">${s.private_details}</p>` : ""}
+        </div>
+      `,
+      )
+      .join("\n");
+    projectsSection = `<h3>Projects</h3>${items}`;
+
+    const textItems = projects
+      .map((s) => {
+        let entry = `- ${s.participant_name}: ${s.description}`;
+        if (s.contact_info) entry += `\n  Contact: ${s.contact_info}`;
+        return entry;
+      })
+      .join("\n");
+    projectsText = `\nProjects:\n${textItems}\n`;
+  }
+
+  const emptyHtml =
+    submissions.length === 0
+      ? "<p>No one shared their attendance this week.</p>"
+      : "";
+  const emptyText =
+    submissions.length === 0 ? "No one shared their attendance this week." : "";
 
   return {
     subject: "Side Project Saturday recap",
@@ -240,13 +264,17 @@ export function sundayRecap(
       <h2>This Week's Recap</h2>
       <p><strong>${eventDate}</strong></p>
       ${imageSection}
-      ${submissions.length > 0 ? items : "<p>No projects were submitted this week.</p>"}
+      ${participantsSection}
+      ${projectsSection}
+      ${emptyHtml}
+      <p><a href="${eventUrl}" style="color: #000000;">View on the site →</a></p>
       ${footer(siteUrl)}
     `),
     text: `Side Project Saturday Recap
 
 ${eventDate}
 
-${textItems}${textFooter(siteUrl)}`,
+${participantsText}${projectsText}${emptyText}
+View on the site: ${eventUrl}${textFooter(siteUrl)}`,
   };
 }

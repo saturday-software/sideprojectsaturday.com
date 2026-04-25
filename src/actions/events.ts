@@ -38,6 +38,24 @@ export const events = {
     },
   }),
 
+  deleteSubmission: defineAction({
+    accept: "form",
+    input: z.object({
+      slug: z.string(),
+      id: z.coerce.number().int(),
+    }),
+    handler: async ({ slug, id }, context) => {
+      requireAdmin(context.cookies);
+      const eventId = env.EVENT_DO.idFromName(slug);
+      const stub = env.EVENT_DO.get(eventId) as DurableObjectStub<EventDO>;
+      const deleted = await stub.deleteSubmission(id);
+      if (!deleted) {
+        throw new ActionError({ code: "NOT_FOUND", message: "Submission not found" });
+      }
+      return { message: "Submission deleted" };
+    },
+  }),
+
   uploadImage: defineAction({
     accept: "form",
     input: z.object({

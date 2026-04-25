@@ -1,5 +1,6 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import Tip from "@/components/Tip.astro";
 import { actions } from "astro:actions";
 import { formatEventDate, slugToDateKey, isSaturday, todayDateKey } from "@/lib/dates";
 import { eventImageKey } from "@/lib/events";
@@ -26,14 +27,16 @@ const id = env.EVENT_DO.idFromName(slug);
 const stub = env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
 
 const submissions = isFuture ? [] : await stub.getPublicSubmissions();
+const projects = submissions.filter((s) => s.description.trim() !== "");
 const imageKey = eventImageKey(slug);
 const hasImage = isFuture ? false : await env.IMAGES_BUCKET.head(imageKey) !== null;
 const eventDate = formatEventDate(date);
 const authenticated = isAdmin(Astro.request);
 
 const uploadResult = Astro.getActionResult(actions.events.uploadImage);
-const message = uploadResult?.data?.message;
-const error = uploadResult?.error?.message;
+const deleteResult = Astro.getActionResult(actions.events.deleteSubmission);
+const message = uploadResult?.data?.message ?? deleteResult?.data?.message;
+const error = uploadResult?.error?.message ?? deleteResult?.error?.message;
 ---
 
 <Layout title={`Event: ${eventDate} — Side Project Saturday`} windowTitle="Side Project Saturday">
@@ -63,25 +66,106 @@ const error = uploadResult?.error?.message;
     <p>This event hasn't happened yet! Check back after {eventDate} to see what people built.</p>
   ) : submissions.length > 0 ? (
     <div>
-      {submissions.map((s) => (
-        <div class="project-card">
-          <h2 style="text-transform: none; letter-spacing: normal;">{s.participant_name}</h2>
-          <p style="margin-bottom: 0;" set:html={renderMarkdown(s.description)} />
-        </div>
-      ))}
+      <h2 class="section-heading">
+        Participants
+        <Tip text="Only includes folks who chose to share they were here." />
+      </h2>
+      <ul class="participant-list">
+        {submissions.map((s) => (
+          <li>
+            <span>{s.participant_name}</span>
+            {authenticated && (
+              <form method="POST" action={actions.events.deleteSubmission} class="delete-form">
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="id" value={s.id} />
+                <button type="submit" class="delete-btn" title="Delete submission" onclick={`return confirm('Delete submission from ${s.participant_name}?')`}>
+                  <img src="https://api.iconify.design/pixelarticons/trash.svg" alt="Delete" width="14" height="14" />
+                </button>
+              </form>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {projects.length > 0 && (
+        <>
+          <h2 class="section-heading">Projects</h2>
+          {projects.map((s) => (
+            <div class="project-card">
+              <h3 class="project-name">{s.participant_name}</h3>
+              <p style="margin-bottom: 0;" set:html={renderMarkdown(s.description)} />
+            </div>
+          ))}
+        </>
+      )}
     </div>
   ) : (
-    <p>No projects were submitted for this event.</p>
+    <p>No one shared their attendance for this event.</p>
   )}
 
   <a href="/" class="back-link">← back</a>
 </Layout>
 
 <style>
+  .section-heading {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 16px;
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  .participant-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+    border: 1px solid #000;
+    background: #fff;
+  }
+
+  .participant-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .participant-list li:last-child {
+    border-bottom: none;
+  }
+
+  .delete-form {
+    margin: 0;
+  }
+
+  .delete-btn {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    opacity: 0.4;
+    display: flex;
+    align-items: center;
+  }
+
+  .delete-btn:hover,
+  .delete-btn:active {
+    opacity: 1;
+    background: none;
+  }
+
   .project-card {
     padding: 12px;
     margin-bottom: 10px;
     border: 1px solid #000;
     background: #fff;
+  }
+
+  .project-name {
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 15px;
+    margin: 0 0 6px;
   }
 </style>

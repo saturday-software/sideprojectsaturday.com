@@ -11,7 +11,8 @@ import {
   fridayReminder,
   sundayRecap,
 } from "@/email/templates";
-import { getCurrentSaturday } from "@/lib/dates";
+import { getCurrentSaturday, dateKeyToSlug } from "@/lib/dates";
+import { eventImageKey } from "@/lib/events";
 
 const TEMPLATES = [
   "verification",
@@ -77,8 +78,8 @@ async function generate(): Promise<{ subject: string; html: string }> {
 
     case "wednesday-announcement":
       return wednesdayAnnouncement(dateKey, address, siteUrl, [
-        { participant_name: "Alice", description: "Built a weather CLI in Rust" },
-        { participant_name: "Bob", description: "Designed a logo for my podcast" },
+        { id: 1, participant_name: "Alice", description: "Built a weather CLI in Rust" },
+        { id: 2, participant_name: "Bob", description: "Designed a logo for my podcast" },
       ], dateKey);
 
     case "wednesday-cancellation":
@@ -92,7 +93,8 @@ async function generate(): Promise<{ subject: string; html: string }> {
         { id: 1, email: "alice@example.com", participant_name: "Alice", description: "Built a weather CLI in Rust", contact_info: "@alice", private_details: "", submitted_at: new Date().toISOString() },
         { id: 2, email: "bob@example.com", participant_name: "Bob", description: "Designed a logo for my podcast", contact_info: "", private_details: "Looking for a co-founder", submitted_at: new Date().toISOString() },
         { id: 3, email: "charlie@example.com", participant_name: "Charlie", description: "Shipped v1 of my budgeting app", contact_info: "charlie@example.com", private_details: "", submitted_at: new Date().toISOString() },
-      ], null, siteUrl);
+        { id: 4, email: "dana@example.com", participant_name: "Dana", description: "", contact_info: "", private_details: "", submitted_at: new Date().toISOString() },
+      ], eventImageKey(dateKeyToSlug(dateKey)), siteUrl);
   }
 }
 
