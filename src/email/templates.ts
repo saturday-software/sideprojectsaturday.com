@@ -1,6 +1,18 @@
 import { formatEventDate, dateKeyToSlug } from "@/lib/dates";
-import { getIcsUrl } from "@/lib/calendar";
+import { getGoogleCalendarUrl, getIcsUrl } from "@/lib/calendar";
 import type { PublicSubmission, Submission } from "@/do/EventDO";
+
+function calendarLinksHtml(siteUrl: string, dateKey: string, address: string): string {
+  const ics = getIcsUrl(siteUrl, dateKey);
+  const google = getGoogleCalendarUrl(dateKey, address);
+  return `<p>Add to calendar: <a href="${google}" style="color: #000000;">Google Cal</a> | <a href="${ics}" style="color: #000000;">ics</a></p>`;
+}
+
+function calendarLinksText(siteUrl: string, dateKey: string, address: string): string {
+  const ics = getIcsUrl(siteUrl, dateKey);
+  const google = getGoogleCalendarUrl(dateKey, address);
+  return `Add to calendar:\n  .ics:            ${ics}\n  Google Calendar: ${google}`;
+}
 
 function layout(content: string): string {
   return `<!DOCTYPE html>
@@ -92,7 +104,6 @@ export function wednesdayAnnouncement(
   lastWeekDate: string,
 ): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
-  const calLink = getIcsUrl(siteUrl, dateKey);
 
   let recapSection = "";
   let recapText = "";
@@ -120,7 +131,7 @@ export function wednesdayAnnouncement(
       <h2>Side Project Saturday</h2>
       <p><strong>${eventDate}</strong></p>
       <p>${address}</p>
-      <p><a href="${calLink}" style="color: #000000;">Add to Calendar</a></p>
+      ${calendarLinksHtml(siteUrl, dateKey, address)}
       <p>Come work on your side projects and share what you've been building!</p>
       ${recapSection}
       ${footer(siteUrl)}
@@ -130,7 +141,7 @@ export function wednesdayAnnouncement(
 ${eventDate}
 ${address}
 
-Add to Calendar: ${calLink}
+${calendarLinksText(siteUrl, dateKey, address)}
 
 Come work on your side projects and share what you've been building!
 ${recapText}${textFooter(siteUrl)}`,
@@ -164,7 +175,6 @@ export function fridayReminder(
   siteUrl: string,
 ): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
-  const calLink = getIcsUrl(siteUrl, dateKey);
 
   return {
     subject: "Side Project Saturday is tomorrow!",
@@ -172,7 +182,7 @@ export function fridayReminder(
       <h2>See you tomorrow!</h2>
       <p><strong>${eventDate}</strong></p>
       <p>${address}</p>
-      <p><a href="${calLink}" style="color: #000000;">Add to Calendar</a></p>
+      ${calendarLinksHtml(siteUrl, dateKey, address)}
       ${footer(siteUrl)}
     `),
     text: `Side Project Saturday is tomorrow!
@@ -180,7 +190,7 @@ export function fridayReminder(
 ${eventDate}
 ${address}
 
-Add to Calendar: ${calLink}${textFooter(siteUrl)}`,
+${calendarLinksText(siteUrl, dateKey, address)}${textFooter(siteUrl)}`,
   };
 }
 
