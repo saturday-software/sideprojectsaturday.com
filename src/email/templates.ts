@@ -204,6 +204,7 @@ export function sundayRecap(
   siteUrl: string,
 ): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
+  const eventUrl = `${siteUrl}/events/${dateKeyToSlug(dateKey)}`;
 
   let imageSection = "";
   if (imageKey) {
@@ -266,12 +267,14 @@ export function sundayRecap(
       ${participantsSection}
       ${projectsSection}
       ${emptyHtml}
+      <p><a href="${eventUrl}" style="color: #000000;">View on the site →</a></p>
       ${footer(siteUrl)}
     `),
     text: `Side Project Saturday Recap
 
 ${eventDate}
 
-${participantsText}${projectsText}${emptyText}${textFooter(siteUrl)}`,
+${participantsText}${projectsText}${emptyText}
+View on the site: ${eventUrl}${textFooter(siteUrl)}`,
   };
 }
