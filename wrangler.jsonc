@@ -52,6 +52,12 @@
       "bucket_name": "sps-images",
     },
   ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "57a569810f7842b59e61b4135e2079e1",
+    },
+  ],
   "send_email": [
     {
       "name": "EMAIL",
