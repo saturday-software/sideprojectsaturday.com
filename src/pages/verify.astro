@@ -1,7 +1,7 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { env } from "cloudflare:workers";
-import { verifySubscriber } from "@/lib/subscribers";
+import { verifySubscriber, invalidateSubscriberCount, invalidateVerifiedList } from "@/lib/subscribers";
 import { getCurrentSaturday } from "@/lib/dates";
 import { getIcsUrl } from "@/lib/calendar";
 
@@ -11,6 +11,10 @@ let success = false;
 if (token) {
   const db = env.DB;
   success = await verifySubscriber(db, token);
+  if (success) {
+    await invalidateSubscriberCount(env.CACHE);
+    await invalidateVerifiedList(env.CACHE);
+  }
 }
 
 const address = env.EVENT_ADDRESS;

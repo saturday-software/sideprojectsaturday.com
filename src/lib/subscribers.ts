@@ -72,25 +72,48 @@ export async function unsubscribe(
   return (result.meta?.changes ?? 0) > 0;
 }
 
+// Long TTL because mutations invalidate explicitly; the TTL is a safety net.
+const LIST_CACHE_TTL_SECONDS = 60 * 60 * 24 * 7;
+const VERIFIED_CACHE_KEY = "subscribers-verified";
+const PARTICIPANTS_CACHE_KEY = "subscribers-participants";
+
 export async function getVerifiedSubscribers(
-  db: D1Database
+  db: D1Database,
+  cache: KVNamespace,
 ): Promise<{ email: string }[]> {
+  const cached = await cache.get<string[]>(VERIFIED_CACHE_KEY, "json");
+  if (cached) return cached.map((email) => ({ email }));
+
   const { results } = await db
     .prepare("SELECT email FROM subscribers WHERE status = 'verified'")
     .all<{ email: string }>();
 
+  await cache.put(
+    VERIFIED_CACHE_KEY,
+    JSON.stringify(results.map((r) => r.email)),
+    { expirationTtl: LIST_CACHE_TTL_SECONDS },
+  );
   return results;
 }
 
 export async function getParticipants(
-  db: D1Database
+  db: D1Database,
+  cache: KVNamespace,
 ): Promise<{ email: string }[]> {
+  const cached = await cache.get<string[]>(PARTICIPANTS_CACHE_KEY, "json");
+  if (cached) return cached.map((email) => ({ email }));
+
   const { results } = await db
     .prepare(
       "SELECT email FROM subscribers WHERE status = 'verified' AND is_participant = 1"
     )
     .all<{ email: string }>();
 
+  await cache.put(
+    PARTICIPANTS_CACHE_KEY,
+    JSON.stringify(results.map((r) => r.email)),
+    { expirationTtl: LIST_CACHE_TTL_SECONDS },
+  );
   return results;
 }
 
@@ -134,20 +157,50 @@ export async function getSubscribers(
   return { subscribers: results, total: total?.count ?? 0 };
 }
 
-export async function getSubscriberCount(
-  db: D1Database
-): Promise<{ total: number; verified: number }> {
-  const total = await db
-    .prepare("SELECT COUNT(*) as count FROM subscribers")
-    .first<{ count: number }>();
-  const verified = await db
-    .prepare("SELECT COUNT(*) as count FROM subscribers WHERE status = 'verified'")
-    .first<{ count: number }>();
+interface SubscriberCount {
+  total: number;
+  verified: number;
+}
 
-  return {
-    total: total?.count ?? 0,
-    verified: verified?.count ?? 0,
+const COUNT_CACHE_KEY = "subscriber-count";
+// Long TTL because mutations invalidate explicitly; the TTL is a safety net
+// for missed invalidations (e.g. crashes between DB write and KV delete).
+const COUNT_CACHE_TTL_SECONDS = 60 * 60 * 24;
+
+export async function getSubscriberCount(
+  db: D1Database,
+  cache: KVNamespace,
+): Promise<SubscriberCount> {
+  const cached = await cache.get<SubscriberCount>(COUNT_CACHE_KEY, "json");
+  if (cached) return cached;
+
+  // One pass instead of two COUNT(*) scans.
+  const row = await db
+    .prepare(
+      "SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) AS verified FROM subscribers"
+    )
+    .first<{ total: number; verified: number | null }>();
+
+  const counts: SubscriberCount = {
+    total: row?.total ?? 0,
+    verified: row?.verified ?? 0,
   };
+  await cache.put(COUNT_CACHE_KEY, JSON.stringify(counts), {
+    expirationTtl: COUNT_CACHE_TTL_SECONDS,
+  });
+  return counts;
+}
+
+export async function invalidateSubscriberCount(cache: KVNamespace): Promise<void> {
+  await cache.delete(COUNT_CACHE_KEY);
+}
+
+export async function invalidateVerifiedList(cache: KVNamespace): Promise<void> {
+  await cache.delete(VERIFIED_CACHE_KEY);
+}
+
+export async function invalidateParticipantsList(cache: KVNamespace): Promise<void> {
+  await cache.delete(PARTICIPANTS_CACHE_KEY);
 }
 
 export async function deleteSubscriber(

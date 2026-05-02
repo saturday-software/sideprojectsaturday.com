@@ -1,7 +1,14 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { env } from "cloudflare:workers";
-import { unsubscribe, generateUnsubscribeToken, verifyUnsubscribeToken } from "@/lib/subscribers";
+import {
+  unsubscribe,
+  generateUnsubscribeToken,
+  verifyUnsubscribeToken,
+  invalidateSubscriberCount,
+  invalidateVerifiedList,
+  invalidateParticipantsList,
+} from "@/lib/subscribers";
 import { sendEmail } from "@/email/send";
 import { unsubscribeConfirmationEmail } from "@/email/templates";
 
@@ -42,6 +49,11 @@ if (method === "POST") {
     );
     if (valid) {
       const ok = await unsubscribe(env.DB, decodeURIComponent(email));
+      if (ok) {
+        await invalidateSubscriberCount(env.CACHE);
+        await invalidateVerifiedList(env.CACHE);
+        await invalidateParticipantsList(env.CACHE);
+      }
       state = ok ? { kind: "success" } : { kind: "error" };
     } else {
       state = { kind: "invalid" };

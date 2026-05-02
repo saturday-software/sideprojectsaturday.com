@@ -46,7 +46,7 @@ if (authenticated) {
   const today = todayDateKey();
   const shareCodeDate = isSaturday(today) ? today : nextActive;
   shareCode = await generateShareCode(env.SHARE_SEED, shareCodeDate);
-  subscriberCount = await getSubscriberCount(env.DB);
+  subscriberCount = await getSubscriberCount(env.DB, env.CACHE);
   doorRules = await getRules(env.DB);
 
   const mbId = env.MAILBOX_DO.idFromName("hello");

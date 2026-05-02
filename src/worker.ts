@@ -14,7 +14,7 @@ import {
 } from "./email/templates";
 import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
 import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
-import { getVerifiedSubscribers, getParticipants, cleanupExpiredPending } from "./lib/subscribers";
+import { getVerifiedSubscribers, getParticipants, cleanupExpiredPending, invalidateSubscriberCount } from "./lib/subscribers";
 
 async function sendInBccBatches(
   env: Env,
@@ -83,7 +83,8 @@ export default {
 
     try {
       // Clean up unverified subscribers on every cron run
-      await cleanupExpiredPending(env.DB);
+      const removed = await cleanupExpiredPending(env.DB);
+      if (removed > 0) await invalidateSubscriberCount(env.CACHE);
 
       if (cron === "0 13 * * WED") {
         // Wednesday: announcement or cancellation
@@ -95,7 +96,7 @@ export default {
         const lastWeekStub = getEventDO(env, lastWeekSlug);
         const lastWeekSubmissions = await lastWeekStub.getPublicSubmissions();
 
-        const subscribers = await getVerifiedSubscribers(env.DB);
+        const subscribers = await getVerifiedSubscribers(env.DB, env.CACHE);
 
         const template = cancelled
           ? wednesdayCancellation(saturdayKey, env.SITE_URL)
@@ -117,7 +118,7 @@ export default {
           return;
         }
 
-        const subscribers = await getVerifiedSubscribers(env.DB);
+        const subscribers = await getVerifiedSubscribers(env.DB, env.CACHE);
         const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
         await sendInBccBatches(env, subscribers, template);
@@ -140,7 +141,7 @@ export default {
         const imageKey = eventImageKey(recapSlug);
         const hasImage = await env.IMAGES_BUCKET.head(imageKey) !== null;
 
-        const participants = await getParticipants(env.DB);
+        const participants = await getParticipants(env.DB, env.CACHE);
         const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
 
         await sendInBccBatches(env, participants, template);

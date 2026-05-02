@@ -8,6 +8,23 @@ CREATE TABLE IF NOT EXISTS subscribers (
   verified_at TEXT
 );
 
+-- Partial index: only pending rows hold a token, so this stays tiny while
+-- making the verification UPDATE an index lookup instead of a full scan.
+CREATE INDEX IF NOT EXISTS idx_subscribers_verification_token
+  ON subscribers(verification_token)
+  WHERE verification_token IS NOT NULL;
+
+-- Speeds up status-filtered reads: getVerifiedSubscribers (cron) and
+-- cleanupExpiredPending (cron, on 'pending' rows).
+CREATE INDEX IF NOT EXISTS idx_subscribers_status
+  ON subscribers(status);
+
+-- Partial index for getParticipants: only verified participants are indexed,
+-- so it stays small and serves the cron query directly.
+CREATE INDEX IF NOT EXISTS idx_subscribers_participants
+  ON subscribers(email)
+  WHERE status = 'verified' AND is_participant = 1;
+
 CREATE TABLE IF NOT EXISTS events (
   date INTEGER PRIMARY KEY NOT NULL,
   cancelled INTEGER NOT NULL DEFAULT 0,
