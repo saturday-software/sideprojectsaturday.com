@@ -1,7 +1,7 @@
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { env } from "cloudflare:workers";
-import { addSubscriber } from "@/lib/subscribers";
+import { addSubscriber, invalidateSubscriberCount } from "@/lib/subscribers";
 import { sendEmail } from "@/email/send";
 import { verificationEmail } from "@/email/templates";
 
@@ -15,6 +15,11 @@ export const subscribe = defineAction({
   handler: async ({ email }) => {
     const normalized = email.trim().toLowerCase();
     const result = await addSubscriber(env.DB, normalized);
+
+    if (result.status === "sent") {
+      // New row or refreshed pending row may have changed total count.
+      await invalidateSubscriberCount(env.CACHE);
+    }
 
     if (result.status === "verified") {
       return {

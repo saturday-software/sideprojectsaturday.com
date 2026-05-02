@@ -5,7 +5,12 @@ import { requireAdmin } from "@/lib/auth";
 import { isEventCancelled, setEventCancelled } from "@/lib/events";
 import { addRule, deleteRule, toggleRule, toggleEventOnly } from "@/lib/door";
 import { switchbotPress } from "@/lib/switchbot";
-import { deleteSubscriber } from "@/lib/subscribers";
+import {
+  deleteSubscriber,
+  invalidateSubscriberCount,
+  invalidateVerifiedList,
+  invalidateParticipantsList,
+} from "@/lib/subscribers";
 
 export const admin = {
   login: defineAction({
@@ -116,6 +121,9 @@ export const admin = {
       if (!deleted) {
         throw new ActionError({ code: "NOT_FOUND", message: "Subscriber not found" });
       }
+      await invalidateSubscriberCount(env.CACHE);
+      await invalidateVerifiedList(env.CACHE);
+      await invalidateParticipantsList(env.CACHE);
       return { message: "Subscriber deleted" };
     },
   }),

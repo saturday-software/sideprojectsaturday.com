@@ -4,7 +4,7 @@ import { env } from "cloudflare:workers";
 import { dateKeyToSlug } from "@/lib/dates";
 import { eventImageKey, recordEventImageUpload } from "@/lib/events";
 import { requireAdmin } from "@/lib/auth";
-import { markAsParticipant } from "@/lib/subscribers";
+import { markAsParticipant, invalidateParticipantsList } from "@/lib/subscribers";
 import type { EventDO } from "@/do/EventDO";
 
 export const events = {
@@ -33,6 +33,7 @@ export const events = {
       });
 
       await markAsParticipant(env.DB, input.email.trim().toLowerCase());
+      await invalidateParticipantsList(env.CACHE);
 
       return { slug, shareCode: input.share_code };
     },
