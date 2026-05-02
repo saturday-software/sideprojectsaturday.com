@@ -1,8 +1,8 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { actions } from "astro:actions";
-import { getCurrentSaturday, getNextSaturday } from "@/lib/dates";
-import { ensureEvent, isEventCancelled } from "@/lib/events";
+import { getCurrentSaturday, getNextSaturday, formatEventDate } from "@/lib/dates";
+import { ensureEvent, eventImageKey, getLatestEventImage, isEventCancelled } from "@/lib/events";
 import { env } from "cloudflare:workers";
 
 const result = Astro.getActionResult(actions.subscribe);
@@ -45,12 +45,30 @@ if (!cancelled) {
     nextEventLabel = `In ${daysUntil} days`;
   }
 }
+
+// Latest event with a recap image. KV-cached; updated on upload, invalidated on delete.
+const lastEventImage = await getLatestEventImage(env.CACHE, env.IMAGES_BUCKET);
 ---
 
 <Layout windowTitle="Side Project Saturday">
   <p>
     A small meetup every Saturday morning from 9am til noon in downtown Brooklyn that carves out a space to make progress on your side project with like minded builders and to see what others are working on.
   </p>
+
+  {lastEventImage && (
+    <div class="last-event">
+      <a href={`/events/${lastEventImage.slug}`}>
+        <img
+          src={`/api/image/${eventImageKey(lastEventImage.slug)}`}
+          alt={`Photo from ${formatEventDate(lastEventImage.date)} event`}
+          class="last-event-img"
+        />
+      </a>
+      <p class="last-event-caption">
+        From <a href={`/events/${lastEventImage.slug}`}>{formatEventDate(lastEventImage.date)}</a> · <a href="/events">see all past events →</a>
+      </p>
+    </div>
+  )}
 
   {message && <div class="message success">{message}</div>}
   {error && <div class="message error">{error}</div>}
@@ -90,3 +108,21 @@ if (!cancelled) {
     </p>
   </div>
 </Layout>
+
+<style>
+  .last-event {
+    margin-bottom: 16px;
+  }
+
+  .last-event-img {
+    display: block;
+    width: 100%;
+    border: 1px solid #000;
+  }
+
+  .last-event-caption {
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: #666;
+  }
+</style>

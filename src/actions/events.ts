@@ -2,7 +2,7 @@ import { defineAction, ActionError } from "astro:actions";
 import { z } from "astro/zod";
 import { env } from "cloudflare:workers";
 import { dateKeyToSlug } from "@/lib/dates";
-import { eventImageKey } from "@/lib/events";
+import { eventImageKey, recordEventImageUpload } from "@/lib/events";
 import { requireAdmin } from "@/lib/auth";
 import { markAsParticipant } from "@/lib/subscribers";
 import type { EventDO } from "@/do/EventDO";
@@ -75,6 +75,8 @@ export const events = {
         httpMetadata: { contentType: image.type },
         customMetadata: { source: `event:${slug}` },
       });
+
+      await recordEventImageUpload(env.CACHE, slug);
 
       return { message: "Image uploaded" };
     },
