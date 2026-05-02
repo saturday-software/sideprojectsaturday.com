@@ -5,7 +5,14 @@ import {
   verifySubscriber,
   unsubscribe,
   getVerifiedSubscribers,
+  getParticipants,
+  getSubscriberCount,
+  markAsParticipant,
+  deleteSubscriber,
   cleanupExpiredPending,
+  invalidateSubscriberCount,
+  invalidateVerifiedList,
+  invalidateParticipantsList,
 } from "@/lib/subscribers";
 
 const SCHEMA =
@@ -14,6 +21,8 @@ const SCHEMA =
 beforeEach(async () => {
   await env.DB.exec("DROP TABLE IF EXISTS subscribers");
   await env.DB.exec(SCHEMA);
+  const keys = await env.CACHE.list();
+  await Promise.all(keys.keys.map((k) => env.CACHE.delete(k.name)));
 });
 
 describe("addSubscriber", () => {
@@ -148,7 +157,7 @@ describe("full lifecycle", () => {
     };
     await verifySubscriber(env.DB, token);
 
-    const verified = await getVerifiedSubscribers(env.DB);
+    const verified = await getVerifiedSubscribers(env.DB, env.CACHE);
     expect(verified).toEqual([{ email: "alice@test.com" }]);
   });
 
@@ -160,7 +169,7 @@ describe("full lifecycle", () => {
     await verifySubscriber(env.DB, token);
     await unsubscribe(env.DB, "alice@test.com");
 
-    const verified = await getVerifiedSubscribers(env.DB);
+    const verified = await getVerifiedSubscribers(env.DB, env.CACHE);
     expect(verified).toEqual([]);
   });
 
@@ -234,5 +243,213 @@ describe("cleanupExpiredPending", () => {
       .bind("recent@test.com")
       .run();
     expect(await cleanupExpiredPending(env.DB, 1)).toBe(1);
+  });
+});
+
+// Helper: insert a verified subscriber directly without touching cache.
+async function seedVerified(email: string, isParticipant = false): Promise<void> {
+  await env.DB.prepare(
+    "INSERT INTO subscribers (email, status, is_participant, verified_at) VALUES (?, 'verified', ?, datetime('now'))"
+  )
+    .bind(email, isParticipant ? 1 : 0)
+    .run();
+}
+
+describe("getSubscriberCount", () => {
+  test("counts total and verified on cache miss", async () => {
+    await seedVerified("a@test.com");
+    await seedVerified("b@test.com");
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, status) VALUES (?, 'pending')"
+    )
+      .bind("c@test.com")
+      .run();
+
+    const counts = await getSubscriberCount(env.DB, env.CACHE);
+    expect(counts).toEqual({ total: 3, verified: 2 });
+  });
+
+  test("returns 0/0 for empty table", async () => {
+    const counts = await getSubscriberCount(env.DB, env.CACHE);
+    expect(counts).toEqual({ total: 0, verified: 0 });
+  });
+
+  test("populates the cache after a miss", async () => {
+    await seedVerified("a@test.com");
+
+    expect(await env.CACHE.get("subscriber-count")).toBeNull();
+    await getSubscriberCount(env.DB, env.CACHE);
+    expect(await env.CACHE.get("subscriber-count", "json")).toEqual({
+      total: 1,
+      verified: 1,
+    });
+  });
+
+  test("returns stale cached value when DB changes without invalidation", async () => {
+    await seedVerified("a@test.com");
+    await getSubscriberCount(env.DB, env.CACHE); // populate cache
+
+    await seedVerified("b@test.com"); // mutate DB without invalidating
+
+    const counts = await getSubscriberCount(env.DB, env.CACHE);
+    expect(counts).toEqual({ total: 1, verified: 1 });
+  });
+
+  test("invalidateSubscriberCount forces a recompute on next read", async () => {
+    await seedVerified("a@test.com");
+    await getSubscriberCount(env.DB, env.CACHE);
+
+    await seedVerified("b@test.com");
+    await invalidateSubscriberCount(env.CACHE);
+
+    const counts = await getSubscriberCount(env.DB, env.CACHE);
+    expect(counts).toEqual({ total: 2, verified: 2 });
+  });
+});
+
+describe("getVerifiedSubscribers cache", () => {
+  test("returns DB rows on cache miss", async () => {
+    await seedVerified("a@test.com");
+    await seedVerified("b@test.com");
+
+    const verified = await getVerifiedSubscribers(env.DB, env.CACHE);
+    expect(verified.map((r) => r.email).sort()).toEqual([
+      "a@test.com",
+      "b@test.com",
+    ]);
+  });
+
+  test("populates cache as a string[]", async () => {
+    await seedVerified("a@test.com");
+    await getVerifiedSubscribers(env.DB, env.CACHE);
+
+    expect(await env.CACHE.get("subscribers-verified", "json")).toEqual([
+      "a@test.com",
+    ]);
+  });
+
+  test("returns cached list when DB changes without invalidation", async () => {
+    await seedVerified("a@test.com");
+    await getVerifiedSubscribers(env.DB, env.CACHE);
+
+    await seedVerified("b@test.com");
+
+    const verified = await getVerifiedSubscribers(env.DB, env.CACHE);
+    expect(verified).toEqual([{ email: "a@test.com" }]);
+  });
+
+  test("invalidateVerifiedList forces a fresh read", async () => {
+    await seedVerified("a@test.com");
+    await getVerifiedSubscribers(env.DB, env.CACHE);
+
+    await seedVerified("b@test.com");
+    await invalidateVerifiedList(env.CACHE);
+
+    const verified = await getVerifiedSubscribers(env.DB, env.CACHE);
+    expect(verified.map((r) => r.email).sort()).toEqual([
+      "a@test.com",
+      "b@test.com",
+    ]);
+  });
+});
+
+describe("getParticipants cache", () => {
+  test("returns only verified participants on cache miss", async () => {
+    await seedVerified("nonparticipant@test.com", false);
+    await seedVerified("participant@test.com", true);
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, status, is_participant) VALUES (?, 'pending', 1)"
+    )
+      .bind("pending-participant@test.com")
+      .run();
+
+    const participants = await getParticipants(env.DB, env.CACHE);
+    expect(participants).toEqual([{ email: "participant@test.com" }]);
+  });
+
+  test("populates cache as a string[]", async () => {
+    await seedVerified("p@test.com", true);
+    await getParticipants(env.DB, env.CACHE);
+
+    expect(await env.CACHE.get("subscribers-participants", "json")).toEqual([
+      "p@test.com",
+    ]);
+  });
+
+  test("invalidateParticipantsList forces a fresh read", async () => {
+    await seedVerified("a@test.com", true);
+    await getParticipants(env.DB, env.CACHE);
+
+    await seedVerified("b@test.com", true);
+    await invalidateParticipantsList(env.CACHE);
+
+    const participants = await getParticipants(env.DB, env.CACHE);
+    expect(participants.map((r) => r.email).sort()).toEqual([
+      "a@test.com",
+      "b@test.com",
+    ]);
+  });
+
+  test("verified-list and participants-list caches are independent", async () => {
+    await seedVerified("a@test.com", true);
+    await getVerifiedSubscribers(env.DB, env.CACHE);
+    await getParticipants(env.DB, env.CACHE);
+
+    await invalidateParticipantsList(env.CACHE);
+
+    expect(await env.CACHE.get("subscribers-verified")).not.toBeNull();
+    expect(await env.CACHE.get("subscribers-participants")).toBeNull();
+  });
+});
+
+describe("mutation helpers leave cache untouched", () => {
+  // The lib mutation functions intentionally do NOT touch KV — invalidation
+  // is the caller's responsibility. These tests pin that contract so a future
+  // refactor that bakes in cache invalidation is a deliberate choice.
+
+  test("verifySubscriber does not invalidate any cache", async () => {
+    const { token } = (await addSubscriber(env.DB, "a@test.com")) as {
+      status: "sent";
+      token: string;
+    };
+    await env.CACHE.put("subscriber-count", JSON.stringify({ total: 99, verified: 99 }));
+    await env.CACHE.put("subscribers-verified", JSON.stringify(["stale@test.com"]));
+
+    await verifySubscriber(env.DB, token);
+
+    expect(await env.CACHE.get("subscriber-count")).not.toBeNull();
+    expect(await env.CACHE.get("subscribers-verified")).not.toBeNull();
+  });
+
+  test("unsubscribe does not invalidate any cache", async () => {
+    await seedVerified("a@test.com", true);
+    await env.CACHE.put("subscribers-verified", JSON.stringify(["a@test.com"]));
+    await env.CACHE.put("subscribers-participants", JSON.stringify(["a@test.com"]));
+
+    await unsubscribe(env.DB, "a@test.com");
+
+    expect(await env.CACHE.get("subscribers-verified")).not.toBeNull();
+    expect(await env.CACHE.get("subscribers-participants")).not.toBeNull();
+  });
+
+  test("markAsParticipant does not invalidate any cache", async () => {
+    await seedVerified("a@test.com");
+    await env.CACHE.put("subscribers-participants", JSON.stringify([]));
+
+    await markAsParticipant(env.DB, "a@test.com");
+
+    expect(await env.CACHE.get("subscribers-participants")).not.toBeNull();
+  });
+
+  test("deleteSubscriber does not invalidate any cache", async () => {
+    await seedVerified("a@test.com");
+    const row = await env.DB.prepare("SELECT id FROM subscribers WHERE email = ?")
+      .bind("a@test.com")
+      .first<{ id: number }>();
+    await env.CACHE.put("subscriber-count", JSON.stringify({ total: 1, verified: 1 }));
+
+    await deleteSubscriber(env.DB, row!.id);
+
+    expect(await env.CACHE.get("subscriber-count")).not.toBeNull();
   });
 });
