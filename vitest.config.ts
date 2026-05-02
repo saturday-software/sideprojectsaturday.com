@@ -10,6 +10,7 @@ export default defineConfig({
         d1Databases: {
           DB: { id: "test-db" },
         },
+        kvNamespaces: ["CACHE"],
         email: {
           send_email: [{ name: "EMAIL" }],
         },
