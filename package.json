@@ -36,5 +36,8 @@
   "overrides": {
     "vite": "^7",
     "zod": "^4.3.6"
+  },
+  "patchedDependencies": {
+    "@cloudflare/vitest-pool-workers@0.14.7": "patches/@cloudflare%2Fvitest-pool-workers@0.14.7.patch"
   }
 }
