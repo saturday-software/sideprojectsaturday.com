@@ -2,7 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import { actions } from "astro:actions";
 import { isAdmin } from "@/lib/auth";
-import { getUpcomingSaturdays, dateKeyToSlug } from "@/lib/dates";
+import { getUpcomingSaturdays, dateKeyToSlug, todayDateKey, isSaturday } from "@/lib/dates";
 import { ensureEvent, isEventCancelled } from "@/lib/events";
 import { generateShareCode } from "@/lib/share";
 import { getSubscriberCount } from "@/lib/subscribers";
@@ -43,7 +43,9 @@ if (authenticated) {
   }
 
   const nextActive = events.find((e) => !e.cancelled)?.date ?? saturdays[0];
-  shareCode = await generateShareCode(env.SHARE_SEED, nextActive);
+  const today = todayDateKey();
+  const shareCodeDate = isSaturday(today) ? today : nextActive;
+  shareCode = await generateShareCode(env.SHARE_SEED, shareCodeDate);
   subscriberCount = await getSubscriberCount(env.DB);
   doorRules = await getRules(env.DB);
 
