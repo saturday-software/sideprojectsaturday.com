@@ -5,7 +5,7 @@ export { EventDO, MailboxDO };
 import astroHandler from "@astrojs/cloudflare/entrypoints/server";
 import PostalMime from "postal-mime";
 
-import { sendEmail } from "./email/send";
+import { sendInBccBatches } from "./email/bcc-batches";
 import {
   wednesdayAnnouncement,
   wednesdayCancellation,
@@ -15,31 +15,6 @@ import {
 import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
 import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
 import { getVerifiedSubscribers, getParticipants, cleanupExpiredPending, invalidateSubscriberCount } from "./lib/subscribers";
-
-async function sendInBccBatches(
-  env: Env,
-  recipients: { email: string }[],
-  template: { subject: string; html: string },
-  batchSize = 49,
-): Promise<void> {
-  for (let i = 0; i < recipients.length; i += batchSize) {
-    const batch = recipients.slice(i, i + batchSize);
-    const domain = env.FROM_EMAIL.split("@")[1];
-    await sendEmail(env.EMAIL, {
-      to: `noreply@${domain}`,
-      bcc: batch.map((r) => r.email),
-      replyTo: env.FROM_EMAIL,
-      subject: template.subject,
-      html: template.html,
-      from: env.FROM_EMAIL,
-      headers: {
-        "List-Id": `Side Project Saturday <list.${domain}>`,
-        "List-Unsubscribe": `<${env.SITE_URL}/unsubscribe>`,
-        "Precedence": "bulk",
-      },
-    }, env.MAILBOX_DO);
-  }
-}
 
 function getEventDO(env: Env, slug: string) {
   const id = env.EVENT_DO.idFromName(slug);
