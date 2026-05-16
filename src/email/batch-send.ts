@@ -16,7 +16,7 @@ interface Template {
 
 type SendFn = typeof defaultSendEmail;
 
-const DEFAULT_BATCH_SIZE = 48;
+const DEFAULT_BATCH_SIZE = 20;
 
 export type RecipientMode = "bcc" | "cc";
 
@@ -27,9 +27,9 @@ export interface SendInBatchesArgs {
   batchSize?: number;
   mode?: RecipientMode;
   send?: SendFn;
-  /** Called once per recipient that ultimately failed to deliver (after halving down to size 1). */
+  /** Called once per recipient that ultimately failed to deliver (only fired during the individual-send fallback). */
   onRecipientFailure?: (email: string) => Promise<void> | void;
-  /** Called once per recipient whose individual send succeeded (only invoked when we had to fall back to size 1). */
+  /** Called once per recipient whose individual send succeeded (only fired during the individual-send fallback). */
   onRecipientSuccess?: (email: string) => Promise<void> | void;
 }
 
@@ -52,11 +52,8 @@ export async function sendInBatches(args: SendInBatchesArgs): Promise<void> {
     "Precedence": "bulk",
   };
 
-  const trySend = async (emails: string[]): Promise<void> => {
-    if (emails.length === 0) return;
-
-    if (emails.length === 1) {
-      const [only] = emails;
+  const sendIndividually = async (emails: string[]): Promise<void> => {
+    for (const only of emails) {
       try {
         await send(env.EMAIL, {
           to: only,
@@ -73,6 +70,13 @@ export async function sendInBatches(args: SendInBatchesArgs): Promise<void> {
         console.error(`[sendInBatches] recipient failed email="${only}" err="${msg}"`);
         if (onRecipientFailure) await onRecipientFailure(only);
       }
+    }
+  };
+
+  const trySend = async (emails: string[]): Promise<void> => {
+    if (emails.length === 0) return;
+    if (emails.length === 1) {
+      await sendIndividually(emails);
       return;
     }
 
@@ -90,11 +94,9 @@ export async function sendInBatches(args: SendInBatchesArgs): Promise<void> {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(
-        `[sendInBatches] batch failed size=${emails.length} err="${msg}" emails=${JSON.stringify(emails)}; splitting`,
+        `[sendInBatches] batch failed size=${emails.length} err="${msg}" emails=${JSON.stringify(emails)}; retrying individually`,
       );
-      const mid = Math.ceil(emails.length / 2);
-      await trySend(emails.slice(0, mid));
-      await trySend(emails.slice(mid));
+      await sendIndividually(emails);
     }
   };
 

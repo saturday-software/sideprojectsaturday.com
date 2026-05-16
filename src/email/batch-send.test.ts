@@ -113,17 +113,18 @@ describe("sendInBatches", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  test("on batch failure: halves recursively until isolating per-recipient retries", async () => {
-    // 4 recipients, full batch fails. Halve -> [a,b] fails (also halves into
-    // single sends a, b — both succeed). Then [c,d] succeeds.
-    // Sequence: full(4)=fail, [a,b]=fail, a=ok, b=ok, [c,d]=ok => 5 calls.
+  test("on batch failure: falls back to one individual send per recipient", async () => {
+    // 4 recipients, full batch fails. We then send each individually — no
+    // halving — to avoid double-delivering to addresses that may have already
+    // received the original batch.
+    // Sequence: full(4)=fail, a=ok, b=ok, c=ok, d=ok => 5 calls.
     const send = vi
       .fn<SendFn>()
       .mockRejectedValueOnce(new Error("batch1")) // full 4
-      .mockRejectedValueOnce(new Error("half-ab")) // [a,b]
-      .mockResolvedValueOnce(undefined) // a (single)
-      .mockResolvedValueOnce(undefined) // b (single)
-      .mockResolvedValueOnce(undefined); // [c,d]
+      .mockResolvedValueOnce(undefined) // a
+      .mockResolvedValueOnce(undefined) // b
+      .mockResolvedValueOnce(undefined) // c
+      .mockResolvedValueOnce(undefined); // d
 
     await sendInBatches({
       env: ENV,
@@ -137,26 +138,21 @@ describe("sendInBatches", () => {
 
     const calls = send.mock.calls.map((c) => c[1] as SendOptions);
     expect(calls[0].bcc).toEqual(["a@x.com", "b@x.com", "c@x.com", "d@x.com"]);
-    expect(calls[1].bcc).toEqual(["a@x.com", "b@x.com"]);
-    expect(calls[2].to).toBe("a@x.com");
-    expect(calls[2].bcc).toBeUndefined();
-    expect(calls[3].to).toBe("b@x.com");
-    expect(calls[3].bcc).toBeUndefined();
-    expect(calls[4].bcc).toEqual(["c@x.com", "d@x.com"]);
+    expect(calls[1].to).toBe("a@x.com");
+    expect(calls[1].bcc).toBeUndefined();
+    expect(calls[2].to).toBe("b@x.com");
+    expect(calls[3].to).toBe("c@x.com");
+    expect(calls[4].to).toBe("d@x.com");
   });
 
-  test("on persistent failure: isolates the single bad recipient", async () => {
-    // 3 recipients, batch fails, halve into [a,b] and [c].
-    // [a,b] fails, halves into a and b individually.
-    // Order: [a,b,c] -> [a,b] -> a -> b -> [c].
-    // a fails, b ok, c ok.
+  test("on batch failure: isolates the bad recipient via individual sends", async () => {
+    // [a,b,c] fails -> retry each individually. a fails, b ok, c ok.
     const send = vi
       .fn<SendFn>()
       .mockRejectedValueOnce(new Error("batch")) // [a,b,c]
-      .mockRejectedValueOnce(new Error("half")) // [a,b]
-      .mockRejectedValueOnce(new Error("Invalid email")) // a (single)
-      .mockResolvedValueOnce(undefined) // b (single)
-      .mockResolvedValueOnce(undefined); // [c] (single)
+      .mockRejectedValueOnce(new Error("Invalid email")) // a
+      .mockResolvedValueOnce(undefined) // b
+      .mockResolvedValueOnce(undefined); // c
 
     const onRecipientFailure = vi.fn();
     const onRecipientSuccess = vi.fn();
@@ -174,9 +170,9 @@ describe("sendInBatches", () => {
     expect(onRecipientFailure).toHaveBeenCalledTimes(1);
     expect(onRecipientFailure).toHaveBeenCalledWith("a@x.com");
 
-    // Both c (via singleton batch [c]) and b succeeded as single sends.
-    expect(onRecipientSuccess).toHaveBeenCalledWith("c@x.com");
+    expect(onRecipientSuccess).toHaveBeenCalledTimes(2);
     expect(onRecipientSuccess).toHaveBeenCalledWith("b@x.com");
+    expect(onRecipientSuccess).toHaveBeenCalledWith("c@x.com");
   });
 
   test("does not throw to caller when a batch fails", async () => {
@@ -200,13 +196,13 @@ describe("sendInBatches", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     // batchSize=2 => two top-level batches.
-    // batch1 [a,b] fails -> halves -> a ok, b ok.
+    // batch1 [a,b] fails -> retry individually -> a ok, b ok.
     // batch2 [c,d] ok.
     const send = vi
       .fn<SendFn>()
       .mockRejectedValueOnce(new Error("batch1")) // [a,b]
-      .mockResolvedValueOnce(undefined) // a
-      .mockResolvedValueOnce(undefined) // b
+      .mockResolvedValueOnce(undefined) // a (single)
+      .mockResolvedValueOnce(undefined) // b (single)
       .mockResolvedValueOnce(undefined); // [c,d]
 
     await sendInBatches({
@@ -265,31 +261,21 @@ describe("sendInBatches", () => {
     );
   });
 
-  test("strike callbacks fire only at the leaves when a big batch halves down to one bad address", async () => {
-    // 8 recipients, batch fails. Halve repeatedly until only `bad@x.com`
-    // (index 0) is isolated — that single send fails and should invoke
-    // onRecipientFailure exactly once with that email. Every other leaf
-    // succeeds and should invoke onRecipientSuccess.
-    //
-    // Recursion tree (ceil halving): bad first half is followed until
-    // isolation; siblings succeed at various sizes.
-    // Order of mocked calls:
-    //   1. [bad,b,c,d,e,f,g,h]      fail (top batch)
-    //   2. [bad,b,c,d]              fail (left half)
-    //   3. [bad,b]                  fail (left-left)
-    //   4. bad   (single)           fail  -> onRecipientFailure("bad@x.com")
-    //   5. b     (single)           ok    -> onRecipientSuccess("b@x.com")
-    //   6. [c,d]                    ok    (no callback — multi-recipient)
-    //   7. [e,f,g,h]                ok    (no callback — multi-recipient)
+  test("on batch failure the entire batch is retried one-by-one, firing per-recipient callbacks", async () => {
+    // 8 recipients, batch fails. We send each individually; the bad address
+    // fails and every other succeeds. No batch callback fires for the initial
+    // multi-recipient send (we can't tell which addresses delivered).
     const send = vi
       .fn<SendFn>()
-      .mockRejectedValueOnce(new Error("top")) // 1
-      .mockRejectedValueOnce(new Error("left")) // 2
-      .mockRejectedValueOnce(new Error("left-left")) // 3
-      .mockRejectedValueOnce(new Error("Invalid email")) // 4 — bad
-      .mockResolvedValueOnce(undefined) // 5 — b
-      .mockResolvedValueOnce(undefined) // 6 — [c,d]
-      .mockResolvedValueOnce(undefined); // 7 — [e,f,g,h]
+      .mockRejectedValueOnce(new Error("top")) // initial batch
+      .mockRejectedValueOnce(new Error("Invalid email")) // bad
+      .mockResolvedValueOnce(undefined) // b
+      .mockResolvedValueOnce(undefined) // c
+      .mockResolvedValueOnce(undefined) // d
+      .mockResolvedValueOnce(undefined) // e
+      .mockResolvedValueOnce(undefined) // f
+      .mockResolvedValueOnce(undefined) // g
+      .mockResolvedValueOnce(undefined); // h
 
     const onRecipientFailure = vi.fn();
     const onRecipientSuccess = vi.fn();
@@ -307,16 +293,13 @@ describe("sendInBatches", () => {
       onRecipientSuccess,
     });
 
-    // Exactly one recipient ultimately failed.
     expect(onRecipientFailure).toHaveBeenCalledTimes(1);
     expect(onRecipientFailure).toHaveBeenCalledWith("bad@x.com");
 
-    // Only the b single-send leaf triggers a success callback. c, d, e, f, g, h
-    // went out as multi-recipient batches, which do NOT fire per-recipient
-    // success callbacks (we can't tell from a successful BCC which addresses
-    // actually delivered).
-    expect(onRecipientSuccess).toHaveBeenCalledTimes(1);
-    expect(onRecipientSuccess).toHaveBeenCalledWith("b@x.com");
+    expect(onRecipientSuccess).toHaveBeenCalledTimes(7);
+    for (const addr of ["b@x.com", "c@x.com", "d@x.com", "e@x.com", "f@x.com", "g@x.com", "h@x.com"]) {
+      expect(onRecipientSuccess).toHaveBeenCalledWith(addr);
+    }
   });
 
   test("single-recipient list goes straight to `to:` (no bcc/cc envelope)", async () => {
