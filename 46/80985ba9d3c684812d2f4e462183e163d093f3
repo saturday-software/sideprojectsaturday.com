@@ -1,0 +1,23 @@
+src/db/schema.sql
+  s_72403d63f10738::t_d23f89b9b02edd 8-9
+migrations/0002_add_subscriber_strikes.sql
+  s_72403d63f10738::t_c08ec840f68a62 1-7
+src/lib/subscribers.ts
+  s_72403d63f10738::t_459fb9c070afa7 235-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "4680985ba9d3c684812d2f4e462183e163d093f3",
+  "prompts": {},
+  "sessions": {
+    "s_72403d63f10738": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "78470087-9c65-474c-b3c0-d1022ee1f2e0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
