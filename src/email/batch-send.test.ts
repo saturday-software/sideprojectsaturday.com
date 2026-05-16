@@ -265,6 +265,60 @@ describe("sendInBatches", () => {
     );
   });
 
+  test("strike callbacks fire only at the leaves when a big batch halves down to one bad address", async () => {
+    // 8 recipients, batch fails. Halve repeatedly until only `bad@x.com`
+    // (index 0) is isolated — that single send fails and should invoke
+    // onRecipientFailure exactly once with that email. Every other leaf
+    // succeeds and should invoke onRecipientSuccess.
+    //
+    // Recursion tree (ceil halving): bad first half is followed until
+    // isolation; siblings succeed at various sizes.
+    // Order of mocked calls:
+    //   1. [bad,b,c,d,e,f,g,h]      fail (top batch)
+    //   2. [bad,b,c,d]              fail (left half)
+    //   3. [bad,b]                  fail (left-left)
+    //   4. bad   (single)           fail  -> onRecipientFailure("bad@x.com")
+    //   5. b     (single)           ok    -> onRecipientSuccess("b@x.com")
+    //   6. [c,d]                    ok    (no callback — multi-recipient)
+    //   7. [e,f,g,h]                ok    (no callback — multi-recipient)
+    const send = vi
+      .fn<SendFn>()
+      .mockRejectedValueOnce(new Error("top")) // 1
+      .mockRejectedValueOnce(new Error("left")) // 2
+      .mockRejectedValueOnce(new Error("left-left")) // 3
+      .mockRejectedValueOnce(new Error("Invalid email")) // 4 — bad
+      .mockResolvedValueOnce(undefined) // 5 — b
+      .mockResolvedValueOnce(undefined) // 6 — [c,d]
+      .mockResolvedValueOnce(undefined); // 7 — [e,f,g,h]
+
+    const onRecipientFailure = vi.fn();
+    const onRecipientSuccess = vi.fn();
+
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients(
+        "bad@x.com", "b@x.com", "c@x.com", "d@x.com",
+        "e@x.com", "f@x.com", "g@x.com", "h@x.com",
+      ),
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+      onRecipientFailure,
+      onRecipientSuccess,
+    });
+
+    // Exactly one recipient ultimately failed.
+    expect(onRecipientFailure).toHaveBeenCalledTimes(1);
+    expect(onRecipientFailure).toHaveBeenCalledWith("bad@x.com");
+
+    // Only the b single-send leaf triggers a success callback. c, d, e, f, g, h
+    // went out as multi-recipient batches, which do NOT fire per-recipient
+    // success callbacks (we can't tell from a successful BCC which addresses
+    // actually delivered).
+    expect(onRecipientSuccess).toHaveBeenCalledTimes(1);
+    expect(onRecipientSuccess).toHaveBeenCalledWith("b@x.com");
+  });
+
   test("single-recipient list goes straight to `to:` (no bcc/cc envelope)", async () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
     const onRecipientSuccess = vi.fn();
