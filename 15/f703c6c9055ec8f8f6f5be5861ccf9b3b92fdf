@@ -1,0 +1,29 @@
+src/email/send.ts
+  s_fc313b3891fea8::t_c0da0370f73fa8 45-46
+src/do/MailboxDO.ts
+  s_fc313b3891fea8::t_7e4ea0ad19593b 176
+  s_fc313b3891fea8::t_1d7d839f23f6ab 74-75,82-88
+  s_fc313b3891fea8::t_dac2bc473fdb09 119-120,127-128,132-133
+  s_fc313b3891fea8::t_b1e7ccaea32a20 30-31,42-43
+src/pages/admin/mailbox.astro
+  s_fc313b3891fea8::t_9efcb9dd434ee5 234
+  s_fc313b3891fea8::t_01c95e993a14a6 399-406
+  s_fc313b3891fea8::t_70bf1c4f4f1627 55-75
+  s_fc313b3891fea8::t_f592ab18826ad9 104-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "15f703c6c9055ec8f8f6f5be5861ccf9b3b92fdf",
+  "prompts": {},
+  "sessions": {
+    "s_fc313b3891fea8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3802e574-2f95-4e7b-ae50-5f6efc1eb7ca",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
