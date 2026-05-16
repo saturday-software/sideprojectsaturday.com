@@ -232,6 +232,13 @@ export async function verifyUnsubscribeToken(email: string, token: string, secre
   return expected === token;
 }
 
+// Internal addresses (our own from/reply-to inboxes, test accounts) should
+// never be disabled by the strike system — a transient failure on these
+// must not lock us out of our own list.
+function isInternalAddress(email: string): boolean {
+  return email.toLowerCase().endsWith("@sideprojectsaturday.com");
+}
+
 /**
  * Record a delivery failure for an email. Bumps the strike counter and, on
  * the third strike, flips the row to 'disabled' so future bulk sends skip it.
@@ -242,6 +249,8 @@ export async function recordEmailStrike(
   db: D1Database,
   email: string,
 ): Promise<boolean> {
+  if (isInternalAddress(email)) return false;
+
   const row = await db
     .prepare(
       `UPDATE subscribers
@@ -264,6 +273,8 @@ export async function clearEmailStrikes(
   db: D1Database,
   email: string,
 ): Promise<void> {
+  if (isInternalAddress(email)) return;
+
   await db
     .prepare("UPDATE subscribers SET strikes = 0 WHERE email = ? AND strikes > 0")
     .bind(email)

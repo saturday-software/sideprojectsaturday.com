@@ -550,6 +550,35 @@ describe("recordEmailStrike", () => {
     const row = await readStrikeRow("ghost@test.com");
     expect(row).toBeNull();
   });
+
+  test("internal @sideprojectsaturday.com addresses are opted out", async () => {
+    // Even if we somehow get strike fallout on our own forwarded inbox,
+    // we must never disable it — that would break replies and verification.
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, status, strikes) VALUES (?, 'verified', 2)",
+    )
+      .bind("hello@sideprojectsaturday.com")
+      .run();
+
+    const disabled = await recordEmailStrike(env.DB, "hello@sideprojectsaturday.com");
+    expect(disabled).toBe(false);
+
+    const row = await readStrikeRow("hello@sideprojectsaturday.com");
+    expect(row).toEqual({ status: "verified", strikes: 2 });
+  });
+
+  test("internal address opt-out is case-insensitive", async () => {
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, status, strikes) VALUES (?, 'verified', 2)",
+    )
+      .bind("Hello@SidePRojectSaturday.com")
+      .run();
+
+    await recordEmailStrike(env.DB, "Hello@SidePRojectSaturday.com");
+
+    const row = await readStrikeRow("Hello@SidePRojectSaturday.com");
+    expect(row).toEqual({ status: "verified", strikes: 2 });
+  });
 });
 
 describe("clearEmailStrikes", () => {
@@ -593,5 +622,18 @@ describe("clearEmailStrikes", () => {
 
     const row = await readStrikeRow("a@test.com");
     expect(row).toEqual({ status: "disabled", strikes: 0 });
+  });
+
+  test("internal @sideprojectsaturday.com addresses are opted out (no write)", async () => {
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, status, strikes) VALUES (?, 'verified', 2)",
+    )
+      .bind("hello@sideprojectsaturday.com")
+      .run();
+
+    await clearEmailStrikes(env.DB, "hello@sideprojectsaturday.com");
+
+    const row = await readStrikeRow("hello@sideprojectsaturday.com");
+    expect(row).toEqual({ status: "verified", strikes: 2 });
   });
 });
