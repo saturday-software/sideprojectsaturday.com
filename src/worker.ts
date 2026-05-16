@@ -5,7 +5,7 @@ export { EventDO, MailboxDO };
 import astroHandler from "@astrojs/cloudflare/entrypoints/server";
 import PostalMime from "postal-mime";
 
-import { sendInBccBatches } from "./email/bcc-batches";
+import { sendInBatches } from "./email/batch-send";
 import {
   wednesdayAnnouncement,
   wednesdayCancellation,
@@ -83,7 +83,7 @@ export default {
               lastWeekKey,
             );
 
-        await sendInBccBatches(env, subscribers, template);
+        await sendInBatches(env, subscribers, template);
       } else if (cron === "0 13 * * FRI") {
         // Friday: reminder (if not cancelled)
         await ensureEvent(env.DB, saturdayKey);
@@ -96,7 +96,7 @@ export default {
         const subscribers = await getVerifiedSubscribers(env.DB, env.CACHE);
         const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
-        await sendInBccBatches(env, subscribers, template);
+        await sendInBatches(env, subscribers, template);
       } else if (cron === "0 16 * * SUN") {
         // Sunday: recap to participants only
         // On Sunday, yesterday was Saturday
@@ -119,7 +119,7 @@ export default {
         const participants = await getParticipants(env.DB, env.CACHE);
         const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
 
-        await sendInBccBatches(env, participants, template);
+        await sendInBatches(env, participants, template);
       }
       console.log(`[scheduled] ok cron="${cron}"`);
     } catch (e) {

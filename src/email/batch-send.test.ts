@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { sendInBccBatches } from "./bcc-batches";
+import { sendInBatches } from "./batch-send";
 import type { sendEmail } from "./send";
 import type { MailboxDO } from "@/do/MailboxDO";
 
@@ -24,11 +24,11 @@ function recipients(...emails: string[]) {
   return emails.map((email) => ({ email }));
 }
 
-describe("sendInBccBatches", () => {
+describe("sendInBatches", () => {
   test("happy path: single batch with correct envelope, BCC, headers, and body", async () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
 
-    await sendInBccBatches(
+    await sendInBatches(
       ENV,
       recipients("a@x.com", "b@x.com", "c@x.com"),
       TEMPLATE,
@@ -61,7 +61,7 @@ describe("sendInBccBatches", () => {
       ...Array.from({ length: 7 }, (_, i) => `u${i}@x.com`),
     );
 
-    await sendInBccBatches(ENV, recips, TEMPLATE, 3, send);
+    await sendInBatches(ENV, recips, TEMPLATE, 3, send);
 
     expect(send).toHaveBeenCalledTimes(3);
     const bccs = send.mock.calls.map((c) => (c[1] as SendOptions).bcc);
@@ -74,7 +74,7 @@ describe("sendInBccBatches", () => {
 
   test("does nothing on empty recipient list", async () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
-    await sendInBccBatches(ENV, [], TEMPLATE, 49, send);
+    await sendInBatches(ENV, [], TEMPLATE, 49, send);
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -84,7 +84,7 @@ describe("sendInBccBatches", () => {
       .mockRejectedValueOnce(new Error("Invalid email address: Invalid input"))
       .mockResolvedValue(undefined);
 
-    await sendInBccBatches(
+    await sendInBatches(
       ENV,
       recipients("a@x.com", "b@x.com", "c@x.com"),
       TEMPLATE,
@@ -119,7 +119,7 @@ describe("sendInBccBatches", () => {
       .mockRejectedValueOnce(new Error("Invalid email address: Invalid input")) // b
       .mockResolvedValueOnce(undefined); // c
 
-    await sendInBccBatches(
+    await sendInBatches(
       ENV,
       recipients("a@x.com", "b@x.com", "c@x.com"),
       TEMPLATE,
@@ -152,7 +152,7 @@ describe("sendInBccBatches", () => {
       .mockRejectedValue(new Error("Invalid email address: Invalid input"));
 
     await expect(
-      sendInBccBatches(
+      sendInBatches(
         ENV,
         recipients("a@x.com", "b@x.com"),
         TEMPLATE,
@@ -175,7 +175,7 @@ describe("sendInBccBatches", () => {
       .mockResolvedValueOnce(undefined) // retry b
       .mockResolvedValueOnce(undefined); // batch 2
 
-    await sendInBccBatches(
+    await sendInBatches(
       ENV,
       recipients("a@x.com", "b@x.com", "c@x.com", "d@x.com"),
       TEMPLATE,
@@ -200,7 +200,7 @@ describe("sendInBccBatches", () => {
       .fn<SendFn>()
       .mockRejectedValue(new Error("Invalid email address: Invalid input"));
 
-    await sendInBccBatches(
+    await sendInBatches(
       ENV,
       recipients("a@x.com", "b@x.com"),
       TEMPLATE,
@@ -219,7 +219,7 @@ describe("sendInBccBatches", () => {
 
   test("derives List-Id domain from FROM_EMAIL", async () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
-    await sendInBccBatches(
+    await sendInBatches(
       { ...ENV, FROM_EMAIL: "noreply@example.org" },
       recipients("a@x.com"),
       TEMPLATE,

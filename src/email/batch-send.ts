@@ -16,7 +16,7 @@ interface Template {
 
 type SendFn = typeof defaultSendEmail;
 
-export async function sendInBccBatches(
+export async function sendInBatches(
   env: BatchEnv,
   recipients: { email: string }[],
   template: Template,
@@ -47,7 +47,7 @@ export async function sendInBccBatches(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(
-        `[sendInBccBatches] batch failed offset=${i} size=${emails.length} err="${msg}" emails=${JSON.stringify(emails)}; retrying per-recipient`
+        `[sendInBatches] batch failed offset=${i} size=${emails.length} err="${msg}" emails=${JSON.stringify(emails)}; retrying per-recipient`
       );
       for (const email of emails) {
         try {
@@ -62,7 +62,7 @@ export async function sendInBccBatches(
           }, env.MAILBOX_DO);
         } catch (perErr) {
           const perMsg = perErr instanceof Error ? perErr.message : String(perErr);
-          console.error(`[sendInBccBatches] recipient failed email="${email}" err="${perMsg}"`);
+          console.error(`[sendInBatches] recipient failed email="${email}" err="${perMsg}"`);
         }
       }
     }
