@@ -52,6 +52,27 @@ if (inboxId) {
 const unreadCount = await mb.getUnreadCount();
 const totalPages = Math.max(1, Math.ceil(total / 25));
 const detail = inboxDetail || outboxDetail;
+
+function parseAddrList(value: string | null | undefined): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function summarizeOutboxRecipients(msg: { to_address: string; cc: string | null; bcc: string | null }): string {
+  const cc = parseAddrList(msg.cc);
+  const bcc = parseAddrList(msg.bcc);
+  const extras = cc.length + bcc.length;
+  if (extras === 0) return msg.to_address;
+  return `${msg.to_address} (+${extras})`;
+}
+
+const outboxDetailCc = parseAddrList(outboxDetail?.cc);
+const outboxDetailBcc = parseAddrList(outboxDetail?.bcc);
 ---
 
 <Layout title="Mailbox — Side Project Saturday" windowTitle={`Mailbox: ${address}@`} wide>
@@ -80,6 +101,32 @@ const detail = inboxDetail || outboxDetail;
             <td class="meta-label">To</td>
             <td>{detail.to_address}</td>
           </tr>
+          {outboxDetailCc.length > 0 && (
+            <tr>
+              <td class="meta-label">Cc</td>
+              <td>
+                <details>
+                  <summary>{outboxDetailCc.length} recipient{outboxDetailCc.length === 1 ? "" : "s"}</summary>
+                  <ul class="recipient-list">
+                    {outboxDetailCc.map((addr) => <li>{addr}</li>)}
+                  </ul>
+                </details>
+              </td>
+            </tr>
+          )}
+          {outboxDetailBcc.length > 0 && (
+            <tr>
+              <td class="meta-label">Bcc</td>
+              <td>
+                <details>
+                  <summary>{outboxDetailBcc.length} recipient{outboxDetailBcc.length === 1 ? "" : "s"}</summary>
+                  <ul class="recipient-list">
+                    {outboxDetailBcc.map((addr) => <li>{addr}</li>)}
+                  </ul>
+                </details>
+              </td>
+            </tr>
+          )}
           <tr>
             <td class="meta-label">Subject</td>
             <td><strong>{detail.subject || "(no subject)"}</strong></td>
@@ -184,7 +231,7 @@ const detail = inboxDetail || outboxDetail;
               <tbody>
                 {outboxMessages.map((msg) => (
                   <tr class:list={{ "send-error": !!msg.error }}>
-                    <td class="addr-cell">{msg.to_address}</td>
+                    <td class="addr-cell">{summarizeOutboxRecipients(msg)}</td>
                     <td>
                       <a href={`/admin/mailbox?address=${address}&outbox_id=${msg.id}&page=${page}`}>
                         {msg.subject || "(no subject)"}
@@ -347,6 +394,14 @@ const detail = inboxDetail || outboxDetail;
     font-size: 11px;
     word-break: break-all;
     color: #666;
+  }
+
+  .recipient-list {
+    margin: 4px 0 0;
+    padding-left: 20px;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
   }
 
   .body-container {

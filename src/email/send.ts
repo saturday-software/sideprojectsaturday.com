@@ -42,6 +42,8 @@ export async function sendEmail(
     await mailbox.storeOutbound({
       from: options.from,
       to: options.to,
+      cc: options.cc,
+      bcc: options.bcc,
       subject: options.subject,
       html: options.html,
       error,
