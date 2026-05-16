@@ -18,7 +18,10 @@ type SendFn = typeof defaultSendEmail;
 
 export type RecipientMode = "bcc" | "cc";
 
-export interface SendInBatchesOptions {
+export interface SendInBatchesArgs {
+  env: BatchEnv;
+  recipients: { email: string }[];
+  template: Template;
   batchSize?: number;
   mode?: RecipientMode;
   send?: SendFn;
@@ -28,13 +31,17 @@ export interface SendInBatchesOptions {
   onRecipientSuccess?: (email: string) => Promise<void> | void;
 }
 
-export async function sendInBatches(
-  env: BatchEnv,
-  recipients: { email: string }[],
-  template: Template,
-  options: SendInBatchesOptions = {},
-): Promise<void> {
-  const { batchSize = 49, mode = "bcc", send = defaultSendEmail } = options;
+export async function sendInBatches(args: SendInBatchesArgs): Promise<void> {
+  const {
+    env,
+    recipients,
+    template,
+    batchSize = 49,
+    mode = "bcc",
+    send = defaultSendEmail,
+    onRecipientFailure,
+    onRecipientSuccess,
+  } = args;
 
   const domain = env.FROM_EMAIL.split("@")[1];
   const headers = {
@@ -58,11 +65,11 @@ export async function sendInBatches(
           from: env.FROM_EMAIL,
           headers,
         }, env.MAILBOX_DO);
-        if (options.onRecipientSuccess) await options.onRecipientSuccess(only);
+        if (onRecipientSuccess) await onRecipientSuccess(only);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[sendInBatches] recipient failed email="${only}" err="${msg}"`);
-        if (options.onRecipientFailure) await options.onRecipientFailure(only);
+        if (onRecipientFailure) await onRecipientFailure(only);
       }
       return;
     }

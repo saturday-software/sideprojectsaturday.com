@@ -113,7 +113,7 @@ export default {
               lastWeekKey,
             );
 
-        await sendInBatches(env, subscribers, template, strikeHandlers);
+        await sendInBatches({ env, recipients: subscribers, template, ...strikeHandlers });
       } else if (cron === "0 13 * * FRI") {
         // Friday: reminder (if not cancelled)
         await ensureEvent(env.DB, saturdayKey);
@@ -126,7 +126,7 @@ export default {
         const subscribers = await getVerifiedSubscribers(env.DB, env.CACHE);
         const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
-        await sendInBatches(env, subscribers, template, strikeHandlers);
+        await sendInBatches({ env, recipients: subscribers, template, ...strikeHandlers });
       } else if (cron === "0 16 * * SUN") {
         // Sunday: recap to participants only
         // On Sunday, yesterday was Saturday
@@ -149,7 +149,7 @@ export default {
         const participants = await getParticipants(env.DB, env.CACHE);
         const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
 
-        await sendInBatches(env, participants, template, strikeHandlers);
+        await sendInBatches({ env, recipients: participants, template, ...strikeHandlers });
       }
       await invalidateListsIfNeeded();
       console.log(`[scheduled] ok cron="${cron}"`);

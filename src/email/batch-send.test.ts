@@ -28,12 +28,13 @@ describe("sendInBatches", () => {
   test("happy path: single batch with correct envelope, BCC, headers, and body", async () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
 
-    await sendInBatches(
-      ENV,
-      recipients("a@x.com", "b@x.com", "c@x.com"),
-      TEMPLATE,
-      { batchSize: 49, send },
-    );
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients("a@x.com", "b@x.com", "c@x.com"),
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+    });
 
     expect(send).toHaveBeenCalledTimes(1);
     const [binding, opts, mailbox] = send.mock.calls[0];
@@ -58,12 +59,13 @@ describe("sendInBatches", () => {
   test("CC mode: puts recipients in cc instead of bcc", async () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
 
-    await sendInBatches(
-      ENV,
-      recipients("a@x.com", "b@x.com"),
-      TEMPLATE,
-      { send, mode: "cc" },
-    );
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients("a@x.com", "b@x.com"),
+      template: TEMPLATE,
+      send,
+      mode: "cc",
+    });
 
     expect(send).toHaveBeenCalledTimes(1);
     const opts = send.mock.calls[0][1] as SendOptions;
@@ -77,7 +79,13 @@ describe("sendInBatches", () => {
       ...Array.from({ length: 7 }, (_, i) => `u${i}@x.com`),
     );
 
-    await sendInBatches(ENV, recips, TEMPLATE, { batchSize: 3, send });
+    await sendInBatches({
+      env: ENV,
+      recipients: recips,
+      template: TEMPLATE,
+      batchSize: 3,
+      send,
+    });
 
     expect(send).toHaveBeenCalledTimes(3);
     // First two batches are multi-recipient (BCC envelope); the last is a
@@ -95,7 +103,13 @@ describe("sendInBatches", () => {
 
   test("does nothing on empty recipient list", async () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
-    await sendInBatches(ENV, [], TEMPLATE, { batchSize: 49, send });
+    await sendInBatches({
+      env: ENV,
+      recipients: [],
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+    });
     expect(send).not.toHaveBeenCalled();
   });
 
@@ -111,12 +125,13 @@ describe("sendInBatches", () => {
       .mockResolvedValueOnce(undefined) // b (single)
       .mockResolvedValueOnce(undefined); // [c,d]
 
-    await sendInBatches(
-      ENV,
-      recipients("a@x.com", "b@x.com", "c@x.com", "d@x.com"),
-      TEMPLATE,
-      { batchSize: 49, send },
-    );
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients("a@x.com", "b@x.com", "c@x.com", "d@x.com"),
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+    });
 
     expect(send).toHaveBeenCalledTimes(5);
 
@@ -146,12 +161,15 @@ describe("sendInBatches", () => {
     const onRecipientFailure = vi.fn();
     const onRecipientSuccess = vi.fn();
 
-    await sendInBatches(
-      ENV,
-      recipients("a@x.com", "b@x.com", "c@x.com"),
-      TEMPLATE,
-      { batchSize: 49, send, onRecipientFailure, onRecipientSuccess },
-    );
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients("a@x.com", "b@x.com", "c@x.com"),
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+      onRecipientFailure,
+      onRecipientSuccess,
+    });
 
     expect(onRecipientFailure).toHaveBeenCalledTimes(1);
     expect(onRecipientFailure).toHaveBeenCalledWith("a@x.com");
@@ -166,12 +184,13 @@ describe("sendInBatches", () => {
     const send = vi.fn<SendFn>().mockRejectedValue(new Error("everything fails"));
 
     await expect(
-      sendInBatches(
-        ENV,
-        recipients("a@x.com", "b@x.com"),
-        TEMPLATE,
-        { batchSize: 49, send },
-      ),
+      sendInBatches({
+        env: ENV,
+        recipients: recipients("a@x.com", "b@x.com"),
+        template: TEMPLATE,
+        batchSize: 49,
+        send,
+      }),
     ).resolves.toBeUndefined();
 
     errSpy.mockRestore();
@@ -190,12 +209,13 @@ describe("sendInBatches", () => {
       .mockResolvedValueOnce(undefined) // b
       .mockResolvedValueOnce(undefined); // [c,d]
 
-    await sendInBatches(
-      ENV,
-      recipients("a@x.com", "b@x.com", "c@x.com", "d@x.com"),
-      TEMPLATE,
-      { batchSize: 2, send },
-    );
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients("a@x.com", "b@x.com", "c@x.com", "d@x.com"),
+      template: TEMPLATE,
+      batchSize: 2,
+      send,
+    });
 
     expect(send).toHaveBeenCalledTimes(4);
     const last = send.mock.calls.at(-1)![1] as SendOptions;
@@ -210,12 +230,13 @@ describe("sendInBatches", () => {
 
     const send = vi.fn<SendFn>().mockRejectedValue(new Error("Invalid"));
 
-    await sendInBatches(
-      ENV,
-      recipients("a@x.com", "b@x.com"),
-      TEMPLATE,
-      { batchSize: 49, send },
-    );
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients("a@x.com", "b@x.com"),
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+    });
 
     const messages = errSpy.mock.calls.map((args) => String(args[0]));
     const batchLog = messages.find((m) => m.includes("batch failed"));
@@ -230,12 +251,13 @@ describe("sendInBatches", () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
     // Use 2 recipients so we exercise the multi-recipient path (which is the
     // one that uses the noreply@<domain> envelope).
-    await sendInBatches(
-      { ...ENV, FROM_EMAIL: "noreply@example.org" },
-      recipients("a@x.com", "b@x.com"),
-      TEMPLATE,
-      { batchSize: 49, send },
-    );
+    await sendInBatches({
+      env: { ...ENV, FROM_EMAIL: "noreply@example.org" },
+      recipients: recipients("a@x.com", "b@x.com"),
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+    });
     const opts = send.mock.calls[0][1] as SendOptions;
     expect(opts.to).toBe("noreply@example.org");
     expect(opts.headers!["List-Id"]).toBe(
@@ -247,12 +269,14 @@ describe("sendInBatches", () => {
     const send = vi.fn<SendFn>().mockResolvedValue(undefined);
     const onRecipientSuccess = vi.fn();
 
-    await sendInBatches(
-      ENV,
-      recipients("solo@x.com"),
-      TEMPLATE,
-      { batchSize: 49, send, onRecipientSuccess },
-    );
+    await sendInBatches({
+      env: ENV,
+      recipients: recipients("solo@x.com"),
+      template: TEMPLATE,
+      batchSize: 49,
+      send,
+      onRecipientSuccess,
+    });
 
     expect(send).toHaveBeenCalledTimes(1);
     const opts = send.mock.calls[0][1] as SendOptions;
