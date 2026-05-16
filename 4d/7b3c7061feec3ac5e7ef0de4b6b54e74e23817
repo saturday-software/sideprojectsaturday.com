@@ -1,0 +1,20 @@
+src/pages/admin/users.astro
+  s_383ff1cf1b4241::t_b3474474e50182 61
+  s_383ff1cf1b4241::t_15a4b10b9e5d2d 107-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "4d7b3c7061feec3ac5e7ef0de4b6b54e74e23817",
+  "prompts": {},
+  "sessions": {
+    "s_383ff1cf1b4241": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1df7dae-5dc8-424a-a298-84486a70d47c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
