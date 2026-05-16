@@ -1,0 +1,26 @@
+src/email/batch-send.test.ts
+  s_72403d63f10738::t_ebb8ed145e9a06 35,47,58-73,80,98,102,108-110,116,118,121,123-125,129,133-135,137,140-141,145-147,153,156-157,159-161,166,173,183-185,188-191,197,211,217,237,245-262
+  s_72403d63f10738::t_fb7b0892531641 83-89,91-93
+  s_72403d63f10738::t_b7c41da27dc4d9 103-105,111-112,126-128,130
+  s_72403d63f10738::t_14ce6632f30e6d 136,142-144
+  s_72403d63f10738::t_4dad4ba6a22b47 231-232,235
+src/email/batch-send.ts
+  s_72403d63f10738::t_4f5fb66d62ab48 19-30,35,37-38,46-69,73,84,87-88,90-94
+  s_72403d63f10738::t_083c476b122761 86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "15812e74ac6af3bb2a0dac58ca3b95fa7a3161aa",
+  "prompts": {},
+  "sessions": {
+    "s_72403d63f10738": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "78470087-9c65-474c-b3c0-d1022ee1f2e0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
