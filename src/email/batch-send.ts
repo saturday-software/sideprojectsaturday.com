@@ -16,6 +16,8 @@ interface Template {
 
 type SendFn = typeof defaultSendEmail;
 
+const DEFAULT_BATCH_SIZE = 48;
+
 export type RecipientMode = "bcc" | "cc";
 
 export interface SendInBatchesArgs {
@@ -36,7 +38,7 @@ export async function sendInBatches(args: SendInBatchesArgs): Promise<void> {
     env,
     recipients,
     template,
-    batchSize = 49,
+    batchSize = DEFAULT_BATCH_SIZE,
     mode = "bcc",
     send = defaultSendEmail,
     onRecipientFailure,
