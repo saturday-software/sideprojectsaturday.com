@@ -1,0 +1,19 @@
+src/email/batch-send.test.ts
+  s_72403d63f10738::t_767ecacf703bfb 268-321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "06ca14b0264516b77c775fc69fa16dfed82f9def",
+  "prompts": {},
+  "sessions": {
+    "s_72403d63f10738": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "78470087-9c65-474c-b3c0-d1022ee1f2e0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
