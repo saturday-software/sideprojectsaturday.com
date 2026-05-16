@@ -13,10 +13,12 @@ import {
   invalidateSubscriberCount,
   invalidateVerifiedList,
   invalidateParticipantsList,
+  recordEmailStrike,
+  clearEmailStrikes,
 } from "@/lib/subscribers";
 
 const SCHEMA =
-  "CREATE TABLE IF NOT EXISTS subscribers (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, status TEXT NOT NULL DEFAULT 'pending', is_participant INTEGER NOT NULL DEFAULT 0, verification_token TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), verified_at TEXT)";
+  "CREATE TABLE IF NOT EXISTS subscribers (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, status TEXT NOT NULL DEFAULT 'pending', is_participant INTEGER NOT NULL DEFAULT 0, verification_token TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), verified_at TEXT, strikes INTEGER NOT NULL DEFAULT 0)";
 
 beforeEach(async () => {
   await env.DB.exec("DROP TABLE IF EXISTS subscribers");
@@ -451,5 +453,145 @@ describe("mutation helpers leave cache untouched", () => {
     await deleteSubscriber(env.DB, row!.id);
 
     expect(await env.CACHE.get("subscriber-count")).not.toBeNull();
+  });
+});
+
+async function readStrikeRow(email: string) {
+  return env.DB.prepare(
+    "SELECT status, strikes FROM subscribers WHERE email = ?",
+  )
+    .bind(email)
+    .first<{ status: string; strikes: number }>();
+}
+
+describe("recordEmailStrike", () => {
+  test("first strike: bumps to 1, stays verified, returns false", async () => {
+    await seedVerified("a@test.com");
+
+    const disabled = await recordEmailStrike(env.DB, "a@test.com");
+    expect(disabled).toBe(false);
+
+    const row = await readStrikeRow("a@test.com");
+    expect(row).toEqual({ status: "verified", strikes: 1 });
+  });
+
+  test("second strike: bumps to 2, stays verified, returns false", async () => {
+    await seedVerified("a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+
+    const disabled = await recordEmailStrike(env.DB, "a@test.com");
+    expect(disabled).toBe(false);
+
+    const row = await readStrikeRow("a@test.com");
+    expect(row).toEqual({ status: "verified", strikes: 2 });
+  });
+
+  test("third strike: flips status to disabled, returns true", async () => {
+    await seedVerified("a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+
+    const disabled = await recordEmailStrike(env.DB, "a@test.com");
+    expect(disabled).toBe(true);
+
+    const row = await readStrikeRow("a@test.com");
+    expect(row).toEqual({ status: "disabled", strikes: 3 });
+  });
+
+  test("further strikes past 3: keeps counting but does not re-trigger disable", async () => {
+    await seedVerified("a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com"); // disables
+
+    // Already disabled — bumping again should not return true again.
+    const disabledAgain = await recordEmailStrike(env.DB, "a@test.com");
+    expect(disabledAgain).toBe(false);
+
+    const row = await readStrikeRow("a@test.com");
+    expect(row).toEqual({ status: "disabled", strikes: 4 });
+  });
+
+  test("does not disable a pending subscriber even at 3 strikes", async () => {
+    // Pending rows aren't part of the bulk-send audience, but the helper
+    // still gets called if a verified user is mid-status-change. Guard
+    // against accidentally promoting non-verified rows to 'disabled'.
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, status, strikes) VALUES (?, 'pending', 2)",
+    )
+      .bind("p@test.com")
+      .run();
+
+    const disabled = await recordEmailStrike(env.DB, "p@test.com");
+    expect(disabled).toBe(false);
+
+    const row = await readStrikeRow("p@test.com");
+    expect(row).toEqual({ status: "pending", strikes: 3 });
+  });
+
+  test("does not disable an unsubscribed subscriber at 3 strikes", async () => {
+    await env.DB.prepare(
+      "INSERT INTO subscribers (email, status, strikes) VALUES (?, 'unsubscribed', 2)",
+    )
+      .bind("u@test.com")
+      .run();
+
+    const disabled = await recordEmailStrike(env.DB, "u@test.com");
+    expect(disabled).toBe(false);
+
+    const row = await readStrikeRow("u@test.com");
+    expect(row).toEqual({ status: "unsubscribed", strikes: 3 });
+  });
+
+  test("unknown email is a no-op and returns false", async () => {
+    const disabled = await recordEmailStrike(env.DB, "ghost@test.com");
+    expect(disabled).toBe(false);
+
+    const row = await readStrikeRow("ghost@test.com");
+    expect(row).toBeNull();
+  });
+});
+
+describe("clearEmailStrikes", () => {
+  test("resets strikes to 0 after accumulated failures", async () => {
+    await seedVerified("a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+
+    await clearEmailStrikes(env.DB, "a@test.com");
+
+    const row = await readStrikeRow("a@test.com");
+    expect(row).toEqual({ status: "verified", strikes: 0 });
+  });
+
+  test("no-op when strikes already 0", async () => {
+    await seedVerified("a@test.com");
+
+    await clearEmailStrikes(env.DB, "a@test.com");
+
+    const row = await readStrikeRow("a@test.com");
+    expect(row).toEqual({ status: "verified", strikes: 0 });
+  });
+
+  test("unknown email is a no-op", async () => {
+    await expect(
+      clearEmailStrikes(env.DB, "ghost@test.com"),
+    ).resolves.toBeUndefined();
+  });
+
+  test("does NOT un-disable a subscriber that already hit 3 strikes", async () => {
+    // Strikes get cleared on a successful single-recipient send. By the time
+    // we reach 'disabled', getVerifiedSubscribers filters them out, so this
+    // path shouldn't fire — but if it did, we still shouldn't quietly flip
+    // the row back to 'verified' just because a clear came through.
+    await seedVerified("a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com");
+    await recordEmailStrike(env.DB, "a@test.com"); // disables
+
+    await clearEmailStrikes(env.DB, "a@test.com");
+
+    const row = await readStrikeRow("a@test.com");
+    expect(row).toEqual({ status: "disabled", strikes: 0 });
   });
 });

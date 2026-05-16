@@ -253,7 +253,10 @@ export async function recordEmailStrike(
     .bind(email)
     .first<{ status: string; strikes: number }>();
 
-  return row?.status === "disabled" && row.strikes >= 3;
+  // strikes can only go up (clearEmailStrikes sets to 0; status only flips
+  // here), so a row with status='disabled' AND strikes===3 is one we just
+  // transitioned. >3 means we'd already disabled them on a prior call.
+  return row?.status === "disabled" && row.strikes === 3;
 }
 
 /** Clear any accumulated strikes for an email after a successful delivery. */
