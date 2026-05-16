@@ -16,13 +16,26 @@ interface Template {
 
 type SendFn = typeof defaultSendEmail;
 
+export type RecipientMode = "bcc" | "cc";
+
+export interface SendInBatchesOptions {
+  batchSize?: number;
+  mode?: RecipientMode;
+  send?: SendFn;
+  /** Called once per recipient that ultimately failed to deliver (after halving down to size 1). */
+  onRecipientFailure?: (email: string) => Promise<void> | void;
+  /** Called once per recipient whose individual send succeeded (only invoked when we had to fall back to size 1). */
+  onRecipientSuccess?: (email: string) => Promise<void> | void;
+}
+
 export async function sendInBatches(
   env: BatchEnv,
   recipients: { email: string }[],
   template: Template,
-  batchSize = 49,
-  send: SendFn = defaultSendEmail,
+  options: SendInBatchesOptions = {},
 ): Promise<void> {
+  const { batchSize = 49, mode = "bcc", send = defaultSendEmail } = options;
+
   const domain = env.FROM_EMAIL.split("@")[1];
   const headers = {
     "List-Id": `Side Project Saturday <list.${domain}>`,
@@ -30,13 +43,34 @@ export async function sendInBatches(
     "Precedence": "bulk",
   };
 
-  for (let i = 0; i < recipients.length; i += batchSize) {
-    const batch = recipients.slice(i, i + batchSize);
-    const emails = batch.map((r) => r.email);
+  const trySend = async (emails: string[]): Promise<void> => {
+    if (emails.length === 0) return;
+
+    if (emails.length === 1) {
+      const [only] = emails;
+      try {
+        await send(env.EMAIL, {
+          to: only,
+          replyTo: env.FROM_EMAIL,
+          subject: template.subject,
+          html: template.html,
+          text: template.text,
+          from: env.FROM_EMAIL,
+          headers,
+        }, env.MAILBOX_DO);
+        if (options.onRecipientSuccess) await options.onRecipientSuccess(only);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`[sendInBatches] recipient failed email="${only}" err="${msg}"`);
+        if (options.onRecipientFailure) await options.onRecipientFailure(only);
+      }
+      return;
+    }
+
     try {
       await send(env.EMAIL, {
         to: `noreply@${domain}`,
-        bcc: emails,
+        ...(mode === "bcc" ? { bcc: emails } : { cc: emails }),
         replyTo: env.FROM_EMAIL,
         subject: template.subject,
         html: template.html,
@@ -47,24 +81,16 @@ export async function sendInBatches(
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(
-        `[sendInBatches] batch failed offset=${i} size=${emails.length} err="${msg}" emails=${JSON.stringify(emails)}; retrying per-recipient`
+        `[sendInBatches] batch failed size=${emails.length} err="${msg}" emails=${JSON.stringify(emails)}; splitting`,
       );
-      for (const email of emails) {
-        try {
-          await send(env.EMAIL, {
-            to: email,
-            replyTo: env.FROM_EMAIL,
-            subject: template.subject,
-            html: template.html,
-            text: template.text,
-            from: env.FROM_EMAIL,
-            headers,
-          }, env.MAILBOX_DO);
-        } catch (perErr) {
-          const perMsg = perErr instanceof Error ? perErr.message : String(perErr);
-          console.error(`[sendInBatches] recipient failed email="${email}" err="${perMsg}"`);
-        }
-      }
+      const mid = Math.ceil(emails.length / 2);
+      await trySend(emails.slice(0, mid));
+      await trySend(emails.slice(mid));
     }
+  };
+
+  for (let i = 0; i < recipients.length; i += batchSize) {
+    const emails = recipients.slice(i, i + batchSize).map((r) => r.email);
+    await trySend(emails);
   }
 }
