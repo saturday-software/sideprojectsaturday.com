@@ -2,6 +2,7 @@ import type { MailboxDO } from "@/do/MailboxDO";
 
 interface SendEmailOptions {
   to: string;
+  cc?: string[];
   bcc?: string[];
   replyTo?: string;
   subject: string;
@@ -21,6 +22,7 @@ export async function sendEmail(
     await emailBinding.send({
       from: options.from,
       to: options.to,
+      ...(options.cc && options.cc.length > 0 ? { cc: options.cc } : {}),
       ...(options.bcc && options.bcc.length > 0 ? { bcc: options.bcc } : {}),
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
       ...(options.headers ? { headers: options.headers } : {}),
@@ -40,6 +42,8 @@ export async function sendEmail(
     await mailbox.storeOutbound({
       from: options.from,
       to: options.to,
+      cc: options.cc,
+      bcc: options.bcc,
       subject: options.subject,
       html: options.html,
       error,

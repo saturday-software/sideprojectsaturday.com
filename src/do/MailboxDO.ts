@@ -27,6 +27,8 @@ export interface OutboxMessage {
   message_id: string | null;
   from_address: string;
   to_address: string;
+  cc: string | null;
+  bcc: string | null;
   subject: string;
   body_html: string;
   error: string | null;
@@ -37,6 +39,8 @@ export interface OutboxListItem {
   id: number;
   from_address: string;
   to_address: string;
+  cc: string | null;
+  bcc: string | null;
   subject: string;
   error: string | null;
   created_at: string;
@@ -67,12 +71,21 @@ export class MailboxDO extends DurableObject<Env> {
         message_id TEXT,
         from_address TEXT NOT NULL,
         to_address TEXT NOT NULL,
+        cc TEXT,
+        bcc TEXT,
         subject TEXT NOT NULL DEFAULT '',
         body_html TEXT NOT NULL DEFAULT '',
         error TEXT,
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+    for (const col of ["cc", "bcc"]) {
+      try {
+        this.ctx.storage.sql.exec(`ALTER TABLE outbox ADD COLUMN ${col} TEXT`);
+      } catch {
+        // column already exists
+      }
+    }
     this.initialized = true;
   }
 
@@ -103,17 +116,21 @@ export class MailboxDO extends DurableObject<Env> {
     messageId?: string;
     from: string;
     to: string;
+    cc?: string[];
+    bcc?: string[];
     subject: string;
     html: string;
     error?: string;
   }): Promise<void> {
     this.ensureSchema();
     this.ctx.storage.sql.exec(
-      `INSERT INTO outbox (message_id, from_address, to_address, subject, body_html, error)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO outbox (message_id, from_address, to_address, cc, bcc, subject, body_html, error)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       msg.messageId ?? null,
       msg.from,
       msg.to,
+      msg.cc && msg.cc.length > 0 ? JSON.stringify(msg.cc) : null,
+      msg.bcc && msg.bcc.length > 0 ? JSON.stringify(msg.bcc) : null,
       msg.subject,
       msg.html,
       msg.error ?? null,
@@ -156,7 +173,7 @@ export class MailboxDO extends DurableObject<Env> {
 
     const messages = this.ctx.storage.sql
       .exec(
-        `SELECT id, from_address, to_address, subject, error, created_at
+        `SELECT id, from_address, to_address, cc, bcc, subject, error, created_at
          FROM outbox ORDER BY created_at DESC LIMIT ? OFFSET ?`,
         perPage,
         offset,

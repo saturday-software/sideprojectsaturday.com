@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
   is_participant INTEGER NOT NULL DEFAULT 0,
   verification_token TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  verified_at TEXT
+  verified_at TEXT,
+  strikes INTEGER NOT NULL DEFAULT 0
 );
 
 -- Partial index: only pending rows hold a token, so this stays tiny while
