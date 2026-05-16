@@ -1,0 +1,23 @@
+src/email/batch-send.test.ts
+  s_fc313b3891fea8::t_724c941c07cdcb 264-267,270-278,299-302
+  s_fc313b3891fea8::t_ec953cb65b62d3 116-120,124-127,141-145,148-149,153-155,173,175
+  s_fc313b3891fea8::t_052e5ed4cdcfc7 199,204-205
+src/email/batch-send.ts
+  s_fc313b3891fea8::t_a14a863da66800 19,30,32,55-56,73-79,97,99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "1949e0e134f73ca2fa4384252fd7dadf26b1d40e",
+  "prompts": {},
+  "sessions": {
+    "s_fc313b3891fea8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3802e574-2f95-4e7b-ae50-5f6efc1eb7ca",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
