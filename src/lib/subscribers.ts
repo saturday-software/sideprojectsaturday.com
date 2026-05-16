@@ -232,6 +232,41 @@ export async function verifyUnsubscribeToken(email: string, token: string, secre
   return expected === token;
 }
 
+/**
+ * Record a delivery failure for an email. Bumps the strike counter and, on
+ * the third strike, flips the row to 'disabled' so future bulk sends skip it.
+ *
+ * Returns true iff this call caused the row to be disabled.
+ */
+export async function recordEmailStrike(
+  db: D1Database,
+  email: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `UPDATE subscribers
+       SET strikes = strikes + 1,
+           status = CASE WHEN strikes + 1 >= 3 AND status = 'verified' THEN 'disabled' ELSE status END
+       WHERE email = ?
+       RETURNING status, strikes`,
+    )
+    .bind(email)
+    .first<{ status: string; strikes: number }>();
+
+  return row?.status === "disabled" && row.strikes >= 3;
+}
+
+/** Clear any accumulated strikes for an email after a successful delivery. */
+export async function clearEmailStrikes(
+  db: D1Database,
+  email: string,
+): Promise<void> {
+  await db
+    .prepare("UPDATE subscribers SET strikes = 0 WHERE email = ? AND strikes > 0")
+    .bind(email)
+    .run();
+}
+
 /** Delete pending subscribers whose verification expired. */
 export async function cleanupExpiredPending(
   db: D1Database,
