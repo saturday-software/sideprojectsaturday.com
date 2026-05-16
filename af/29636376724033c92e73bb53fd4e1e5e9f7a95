@@ -1,0 +1,22 @@
+src/lib/subscribers.test.ts
+  s_72403d63f10738::t_3864ca5d82ec99 16-17,21
+  s_72403d63f10738::t_9bf021dc03df13 458-597
+src/lib/subscribers.ts
+  s_72403d63f10738::t_aebb5c728bcc34 256-259
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "af29636376724033c92e73bb53fd4e1e5e9f7a95",
+  "prompts": {},
+  "sessions": {
+    "s_72403d63f10738": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "78470087-9c65-474c-b3c0-d1022ee1f2e0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
