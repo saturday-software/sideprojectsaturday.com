@@ -58,7 +58,7 @@ const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
               <td class="action-cell">
                 <form method="POST" action={actions.admin.deleteSubscriber}>
                   <input type="hidden" name="id" value={sub.id} />
-                  <button type="submit" class="delete-btn" title="Delete subscriber" onclick="return confirm('Delete this subscriber?')">
+                  <button type="submit" class="delete-btn" title="Delete subscriber" onclick={`return confirm('Are you sure you want to remove ' + ${JSON.stringify(sub.email)} + '?')`}>
                     <img src="https://api.iconify.design/pixelarticons/trash.svg" alt="Delete" width="16" height="16" />
                   </button>
                 </form>
@@ -102,6 +102,10 @@ const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
     font-weight: bold;
     border-bottom: 2px solid #000;
     white-space: nowrap;
+  }
+
+  .users-table tbody tr:hover td {
+    background: #f0f0f0;
   }
 
   .users-table tr.unverified td {
