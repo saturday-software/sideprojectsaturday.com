@@ -1,0 +1,19 @@
+src/pages/.well-known/atproto-did.ts
+  s_5846412b14de80::t_109ae67d579b3f 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "339381da9466a9aab371480fee316cf65a533796",
+  "prompts": {},
+  "sessions": {
+    "s_5846412b14de80": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d2dc8c82-3dcd-437a-a50a-a72b2a62b7ec",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
