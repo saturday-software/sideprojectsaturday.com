@@ -32,12 +32,6 @@ function getEventDO(env: Env, slug: string) {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    // Bluesky domain handle verification (@sideprojectsaturday.com)
-    if (new URL(request.url).pathname === "/.well-known/atproto-did") {
-      return new Response("did:plc:5d64cskfkhaba3zlar73k7i5", {
-        headers: { "content-type": "text/plain" },
-      });
-    }
     return astroHandler.fetch(request, env, ctx);
   },
 
