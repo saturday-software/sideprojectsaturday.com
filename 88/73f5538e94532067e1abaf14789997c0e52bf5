@@ -1,0 +1,20 @@
+src/worker.ts
+  s_5846412b14de80::t_32aa66de5b92f0 36
+  s_5846412b14de80::t_ff26351d5a030e 35,37-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "8873f5538e94532067e1abaf14789997c0e52bf5",
+  "prompts": {},
+  "sessions": {
+    "s_5846412b14de80": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d2dc8c82-3dcd-437a-a50a-a72b2a62b7ec",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
