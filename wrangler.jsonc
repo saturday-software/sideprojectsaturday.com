@@ -74,5 +74,6 @@
     "SITE_URL": "https://sideprojectsaturday.com",
     "FROM_EMAIL": "hello@sideprojectsaturday.com",
     "EVENT_ADDRESS": "325 Gold St #503",
+    "BSKY_IDENTIFIER": "sideprojectsaturday.com",
   },
 }
