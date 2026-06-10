@@ -1,0 +1,29 @@
+worker-configuration.d.ts
+  s_31cbdf31411309::t_9fa4cdb64fa4c9 2,18
+src/lib/bluesky.ts
+  s_31cbdf31411309::t_dc3dd23ce75054 1-144
+src/env.d.ts
+  s_31cbdf31411309::t_213c9fa8476686 13
+src/worker.ts
+  s_31cbdf31411309::t_1d278828f67fd9 15
+  s_31cbdf31411309::t_7ecf3ca49388a0 118-139
+  s_31cbdf31411309::t_c0947314bc0c07 176-185
+wrangler.jsonc
+  s_31cbdf31411309::t_cd23b04164a02b 77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "79cfcaecb855ce6928b68ddbbcfb9f05fb56e75f",
+  "prompts": {},
+  "sessions": {
+    "s_31cbdf31411309": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "042c1077-56d2-415e-9daf-aae2b9be97df",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Justin Bennett <git@just-be.dev>"
+    }
+  }
+}
