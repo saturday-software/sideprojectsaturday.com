@@ -1,0 +1,167 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import MarkdownEditor from "@/components/MarkdownEditor.astro";
+import { actions } from "astro:actions";
+import { isAdmin } from "@/lib/auth";
+import { getVerifiedSubscribers, getParticipants } from "@/lib/subscribers";
+import { env } from "cloudflare:workers";
+
+const authenticated = isAdmin(Astro.request);
+if (!authenticated) {
+  return Astro.redirect("/admin");
+}
+
+const result = Astro.getActionResult(actions.admin.broadcast);
+const message = result?.data?.message;
+const error = result?.error?.message;
+
+const verified = await getVerifiedSubscribers(env.DB, env.CACHE);
+const participants = await getParticipants(env.DB, env.CACHE);
+---
+
+<Layout title="Send Message — Side Project Saturday" windowTitle="Send Message">
+  <div>
+    <h1>Send Message</h1>
+    <p style="margin-bottom: 12px;">
+      A one-off email to the list.
+      <a href="/admin" style="margin-left: 12px;">← admin</a>
+    </p>
+
+    {message && <div class="message success">{message}</div>}
+    {error && <div class="message error">{error}</div>}
+
+    <form method="POST" action={actions.admin.broadcast} class="broadcast-form">
+      <label for="subject">Subject</label>
+      <input type="text" id="subject" name="subject" maxlength="200" required />
+
+      <MarkdownEditor name="markdown" id="broadcast-editor" label="Message" uploadSource="broadcast" />
+      <p class="hint">
+        Markdown: **bold**, _italic_, [links](https://…), images by drag &amp; drop.
+        The unsubscribe footer is added automatically.
+      </p>
+
+      <fieldset class="audience">
+        <legend>Recipients</legend>
+        <div class="radio-label">
+          <input type="radio" id="aud-verified" name="audience" value="verified" checked />
+          <label for="aud-verified">All verified subscribers ({verified.length})</label>
+        </div>
+        <div class="radio-label">
+          <input type="radio" id="aud-participants" name="audience" value="participants" />
+          <label for="aud-participants">Past participants only ({participants.length})</label>
+        </div>
+      </fieldset>
+
+      <div class="send-block">
+        <h3>1. Send yourself a test</h3>
+        <div class="test-row">
+          <input type="email" name="testEmail" placeholder="you@example.com" />
+          <button type="submit" name="mode" value="test" class="btn">Send test</button>
+        </div>
+      </div>
+
+      <div class="send-block">
+        <h3>2. Send to everyone</h3>
+        <div class="checkbox-label">
+          <input type="checkbox" name="confirm" value="true" id="confirm" />
+          <label for="confirm">I've proofed this message and want to send it to the whole list</label>
+        </div>
+        <button
+          type="submit"
+          name="mode"
+          value="all"
+          class="btn btn-send-all"
+          onclick="return confirm('Send this message to every selected subscriber?')"
+        >
+          Send to list
+        </button>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<style>
+  .broadcast-form {
+    margin-top: 8px;
+  }
+
+  .hint {
+    font-size: 11px;
+    color: #666;
+    margin: 0 0 12px;
+  }
+
+  .audience {
+    border: 1px solid #000;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+  }
+
+  .audience legend {
+    font-size: 12px;
+    padding: 0 4px;
+  }
+
+  .radio-label {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .radio-label label {
+    margin-left: 16px;
+    margin-bottom: 0;
+  }
+
+  .send-block {
+    border-top: 1px solid #ccc;
+    padding-top: 12px;
+    margin-bottom: 16px;
+  }
+
+  .send-block h3 {
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .test-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .test-row input {
+    flex: 1;
+    min-width: 180px;
+    margin-bottom: 0;
+  }
+
+  .checkbox-label {
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  .checkbox-label label {
+    margin-left: 16px;
+  }
+
+  .checkbox-label label::before {
+    height: 10px !important;
+    width: 10px !important;
+    left: -14px !important;
+    margin-left: -2px;
+  }
+
+  .checkbox-label input[type="checkbox"]:checked + label::after {
+    height: 11px !important;
+    width: 11px !important;
+    left: -15px !important;
+    top: 1px !important;
+    background-size: contain !important;
+  }
+
+  .btn-send-all:hover {
+    background: #f00;
+    color: #fff;
+  }
+</style>

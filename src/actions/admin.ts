@@ -7,10 +7,14 @@ import { addRule, deleteRule, toggleRule, toggleEventOnly } from "@/lib/door";
 import { switchbotPress } from "@/lib/switchbot";
 import {
   deleteSubscriber,
+  getParticipants,
+  getVerifiedSubscribers,
   invalidateSubscriberCount,
   invalidateVerifiedList,
   invalidateParticipantsList,
 } from "@/lib/subscribers";
+import { sendBroadcast } from "@/email/broadcast";
+import { broadcastEmail } from "@/email/templates";
 
 export const admin = {
   login: defineAction({
@@ -125,6 +129,63 @@ export const admin = {
       await invalidateVerifiedList(env.CACHE);
       await invalidateParticipantsList(env.CACHE);
       return { message: "Subscriber deleted" };
+    },
+  }),
+
+  broadcast: defineAction({
+    accept: "form",
+    input: z.object({
+      subject: z.string().trim().min(1, "Subject is required").max(200),
+      markdown: z.string().trim().min(1, "Message body is required"),
+      audience: z.enum(["verified", "participants"]).default("verified"),
+      // "test" sends only to testEmail so the message can be proofed before
+      // it goes out to the list; "all" is the real send.
+      mode: z.enum(["test", "all"]).default("test"),
+      testEmail: z.string().trim().optional(),
+      confirm: z.coerce.boolean().optional().default(false),
+    }),
+    handler: async ({ subject, markdown, audience, mode, testEmail, confirm }, context) => {
+      requireAdmin(context.cookies);
+
+      const template = broadcastEmail(subject, markdown, env.SITE_URL);
+
+      if (mode === "test") {
+        const parsed = z.email().safeParse(testEmail ?? "");
+        if (!parsed.success) {
+          throw new ActionError({
+            code: "BAD_REQUEST",
+            message: "Enter a valid address to send the test to",
+          });
+        }
+        await sendBroadcast({ env, recipients: [{ email: parsed.data }], template });
+        return { message: `Test sent to ${parsed.data}` };
+      }
+
+      if (!confirm) {
+        throw new ActionError({
+          code: "BAD_REQUEST",
+          message: "Tick the confirmation box before sending to everyone",
+        });
+      }
+
+      const recipients =
+        audience === "participants"
+          ? await getParticipants(env.DB, env.CACHE)
+          : await getVerifiedSubscribers(env.DB, env.CACHE);
+
+      if (recipients.length === 0) {
+        throw new ActionError({ code: "BAD_REQUEST", message: "No subscribers to send to" });
+      }
+
+      const result = await sendBroadcast({ env, recipients, template });
+      const disabledNote =
+        result.disabled.length > 0
+          ? ` (${result.disabled.length} address${result.disabled.length === 1 ? "" : "es"} disabled after repeated failures)`
+          : "";
+
+      return {
+        message: `Sent to ${result.recipients} subscriber${result.recipients === 1 ? "" : "s"}${disabledNote}`,
+      };
     },
   }),
 
