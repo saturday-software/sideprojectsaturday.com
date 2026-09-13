@@ -22,6 +22,20 @@ function renderImage(alt: string, rawUrl: string): string {
   return `<img src="${safe}" alt="${escapeHtml(alt)}" style="${style}">`;
 }
 
+/**
+ * Plain-text counterpart to renderMarkdown, for the text/plain part of an
+ * email. Images collapse to their alt text and links keep their URL in
+ * parentheses so the text part isn't a dead end.
+ */
+export function markdownToPlainText(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(?<!\w)_(.+?)_(?!\w)/g, "$1");
+}
+
 export function renderMarkdown(text: string): string {
   if (!text) return "";
   let html = escapeHtml(text);

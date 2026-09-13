@@ -3,7 +3,7 @@ import { z } from "astro/zod";
 import { env } from "cloudflare:workers";
 import { requireAdmin } from "@/lib/auth";
 import { sendEmail } from "@/email/send";
-import { renderMarkdown } from "@/lib/render-markdown";
+import { renderMarkdown, markdownToPlainText } from "@/lib/render-markdown";
 import type { MailboxDO } from "@/do/MailboxDO";
 
 function getMailbox(address: string) {
@@ -25,7 +25,7 @@ export const mailbox = {
       requireAdmin(context.cookies);
 
       const html = renderMarkdown(markdown);
-      const text = markdown.replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\*\*(.+?)\*\*/g, "$1").replace(/(?<!\w)_(.+?)_(?!\w)/g, "$1");
+      const text = markdownToPlainText(markdown);
       const from = `${address}@sideprojectsaturday.com`;
       await sendEmail(env.EMAIL, { to, subject, html, text, from }, env.MAILBOX_DO);
 

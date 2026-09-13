@@ -1,5 +1,6 @@
 import { formatEventDate, dateKeyToSlug } from "@/lib/dates";
 import { getGoogleCalendarUrl, getIcsUrl } from "@/lib/calendar";
+import { renderMarkdown, markdownToPlainText } from "@/lib/render-markdown";
 import type { PublicSubmission, Submission } from "@/do/EventDO";
 
 function calendarLinksHtml(siteUrl: string, dateKey: string, address: string): string {
@@ -276,5 +277,29 @@ ${eventDate}
 
 ${participantsText}${projectsText}${emptyText}
 View on the site: ${eventUrl}${textFooter(siteUrl)}`,
+  };
+}
+
+/**
+ * A one-off message composed by hand in the admin UI. The body is the same
+ * markdown dialect the mailbox composer uses; relative image/link URLs are
+ * made absolute because mail clients have no site origin to resolve against.
+ */
+export function broadcastEmail(
+  subject: string,
+  markdown: string,
+  siteUrl: string,
+): { subject: string; html: string; text: string } {
+  const body = renderMarkdown(markdown)
+    .replaceAll('<a href="', `<a style="color: #000000;" href="`)
+    .replaceAll('="/api/image/', `="${siteUrl}/api/image/`);
+
+  return {
+    subject,
+    html: layout(`
+      ${body}
+      ${footer(siteUrl)}
+    `),
+    text: `${markdownToPlainText(markdown)}${textFooter(siteUrl)}`,
   };
 }
