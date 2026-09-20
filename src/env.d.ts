@@ -10,5 +10,6 @@ declare namespace Cloudflare {
     SWITCHBOT_DEVICE_ID: string;
     MAILBOX_DO: DurableObjectNamespace<import("./do/MailboxDO").MailboxDO>;
     UNSUBSCRIBE_SECRET: string;
+    BSKY_APP_PASSWORD: string;
   }
 }

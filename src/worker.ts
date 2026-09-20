@@ -12,6 +12,7 @@ import {
   fridayReminder,
   sundayRecap,
 } from "./email/templates";
+import { postAnnouncement, postCancellation, postRecap } from "./lib/bluesky";
 import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
 import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
 import {
@@ -114,6 +115,28 @@ export default {
             );
 
         await sendInBatches({ env, recipients: subscribers, template, ...strikeHandlers });
+
+        if (env.BSKY_IDENTIFIER && env.BSKY_APP_PASSWORD) {
+          try {
+            if (cancelled) {
+              await postCancellation(env.BSKY_IDENTIFIER, env.BSKY_APP_PASSWORD, saturdayKey);
+            } else {
+              await postAnnouncement(
+                env.BSKY_IDENTIFIER,
+                env.BSKY_APP_PASSWORD,
+                saturdayKey,
+                env.EVENT_ADDRESS,
+                env.SITE_URL,
+                lastWeekSubmissions,
+                lastWeekKey,
+              );
+            }
+            console.log(`[scheduled] bluesky ok cron="${cron}"`);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error(`[scheduled] bluesky throw cron="${cron}" msg="${msg}"`);
+          }
+        }
       } else if (cron === "0 13 * * FRI") {
         // Friday: reminder (if not cancelled)
         await ensureEvent(env.DB, saturdayKey);
@@ -150,6 +173,16 @@ export default {
         const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
 
         await sendInBatches({ env, recipients: participants, template, ...strikeHandlers });
+
+        if (env.BSKY_IDENTIFIER && env.BSKY_APP_PASSWORD) {
+          try {
+            await postRecap(env.BSKY_IDENTIFIER, env.BSKY_APP_PASSWORD, recapKey, submissions, env.SITE_URL);
+            console.log(`[scheduled] bluesky ok cron="${cron}"`);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error(`[scheduled] bluesky throw cron="${cron}" msg="${msg}"`);
+          }
+        }
       }
       await invalidateListsIfNeeded();
       console.log(`[scheduled] ok cron="${cron}"`);
