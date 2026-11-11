@@ -29,13 +29,21 @@
   "devDependencies": {
     "@clack/prompts": "^1.2.0",
     "@cloudflare/vitest-pool-workers": "^0.14.3",
+    "@effect/platform-bun": "4.0.4",
+    "@effect/platform-node": "4.0.4",
     "@vitest/browser-playwright": "^4.1.4",
+    "alchemy": "2.0.0-beta.83",
+    "effect": "4.0.4",
     "vitest": "^4.1.4",
     "wrangler": "^4.81.1"
   },
   "overrides": {
     "vite": "^7",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "effect": "4.0.4",
+    "@effect/platform-node-shared": "4.0.4",
+    "@effect/sql-d1": "4.0.4",
+    "@effect/sql-sqlite-do": "4.0.4"
   },
   "patchedDependencies": {
     "@cloudflare/vitest-pool-workers@0.14.7": "patches/@cloudflare%2Fvitest-pool-workers@0.14.7.patch"

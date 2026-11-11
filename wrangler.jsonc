@@ -1,3 +1,7 @@
+// Used by `astro dev` / `astro build` (the Cloudflare Vite plugin reads `main`,
+// the bindings and the compatibility settings from here) and by the e2e setup.
+// Deploys go through alchemy.run.ts, not `wrangler deploy`: keep the two in
+// sync when you change bindings, vars, crons or compatibility settings.
 {
   "compatibility_date": "2026-04-11",
   "compatibility_flags": ["global_fetch_strictly_public"],

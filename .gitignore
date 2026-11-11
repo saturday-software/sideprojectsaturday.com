@@ -26,3 +26,6 @@ pnpm-debug.log*
 
 .wrangler
 .vitest-attachments
+
+# alchemy
+.alchemy/
