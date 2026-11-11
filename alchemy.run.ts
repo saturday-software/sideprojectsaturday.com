@@ -68,7 +68,8 @@ const PROD = {
   r2ImagesBucket: "sps-images",
   crons: ["0 13 * * WED", "0 13 * * FRI", "0 16 * * SUN"],
   /**
-   * Worker secrets, set with `wrangler secret put`. Alchemy doesn't know
+   * Worker secrets, as live on `side-project` (checked with
+   * `cf workers secrets list` on 2026-11-11). Alchemy doesn't know
    * their values, so prod binds each one as `inherit`: Cloudflare copies it
    * from the latest uploaded version. (Alchemy notes that Cloudflare also
    * keeps secrets an upload omits; `inherit` makes it explicit. Alchemy only
@@ -76,8 +77,8 @@ const PROD = {
    */
   secrets: [
     "ADMIN_PASSWORD",
+    "BSKY_APP_PASSWORD",
     "SHARE_SEED",
-    "UNSUBSCRIBE_SECRET",
     "SWITCHBOT_TOKEN",
     "SWITCHBOT_KEY",
     "SWITCHBOT_DEVICE_ID",
