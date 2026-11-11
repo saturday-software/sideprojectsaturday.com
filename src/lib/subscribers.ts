@@ -1,75 +1,75 @@
 type AddSubscriberResult =
-  | { status: "verified" }
-  | { status: "rate_limited" }
-  | { status: "sent"; token: string };
+	| { status: "verified" }
+	| { status: "rate_limited" }
+	| { status: "sent"; token: string };
 
 export async function addSubscriber(
-  db: D1Database,
-  email: string
+	db: D1Database,
+	email: string,
 ): Promise<AddSubscriberResult> {
-  const existing = await db
-    .prepare("SELECT id, status, created_at FROM subscribers WHERE email = ?")
-    .bind(email)
-    .first<{ id: number; status: string; created_at: string }>();
+	const existing = await db
+		.prepare("SELECT id, status, created_at FROM subscribers WHERE email = ?")
+		.bind(email)
+		.first<{ id: number; status: string; created_at: string }>();
 
-  if (existing) {
-    if (existing.status === "verified") {
-      return { status: "verified" };
-    }
+	if (existing) {
+		if (existing.status === "verified") {
+			return { status: "verified" };
+		}
 
-    // Rate limit: don't resend if pending row was created/updated < 10 min ago
-    const createdAt = new Date(existing.created_at + "Z").getTime();
-    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-    if (createdAt > tenMinutesAgo) {
-      return { status: "rate_limited" };
-    }
+		// Rate limit: don't resend if pending row was created/updated < 10 min ago
+		const createdAt = new Date(existing.created_at + "Z").getTime();
+		const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+		if (createdAt > tenMinutesAgo) {
+			return { status: "rate_limited" };
+		}
 
-    // Refresh token and timestamp for pending/unsubscribed
-    const token = crypto.randomUUID();
-    await db
-      .prepare(
-        "UPDATE subscribers SET verification_token = ?, status = 'pending', created_at = datetime('now') WHERE email = ?"
-      )
-      .bind(token, email)
-      .run();
-    return { status: "sent", token };
-  }
+		// Refresh token and timestamp for pending/unsubscribed
+		const token = crypto.randomUUID();
+		await db
+			.prepare(
+				"UPDATE subscribers SET verification_token = ?, status = 'pending', created_at = datetime('now') WHERE email = ?",
+			)
+			.bind(token, email)
+			.run();
+		return { status: "sent", token };
+	}
 
-  const token = crypto.randomUUID();
-  await db
-    .prepare(
-      "INSERT INTO subscribers (email, status, verification_token) VALUES (?, 'pending', ?)"
-    )
-    .bind(email, token)
-    .run();
+	const token = crypto.randomUUID();
+	await db
+		.prepare(
+			"INSERT INTO subscribers (email, status, verification_token) VALUES (?, 'pending', ?)",
+		)
+		.bind(email, token)
+		.run();
 
-  return { status: "sent", token };
+	return { status: "sent", token };
 }
 
 export async function verifySubscriber(
-  db: D1Database,
-  token: string
+	db: D1Database,
+	token: string,
 ): Promise<boolean> {
-  const result = await db
-    .prepare(
-      "UPDATE subscribers SET status = 'verified', verified_at = datetime('now'), verification_token = NULL WHERE verification_token = ? AND status = 'pending'"
-    )
-    .bind(token)
-    .run();
+	const result = await db
+		.prepare(
+			"UPDATE subscribers SET status = 'verified', verified_at = datetime('now'), verification_token = NULL WHERE verification_token = ? AND status = 'pending'",
+		)
+		.bind(token)
+		.run();
 
-  return (result.meta?.changes ?? 0) > 0;
+	return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function unsubscribe(
-  db: D1Database,
-  email: string
+	db: D1Database,
+	email: string,
 ): Promise<boolean> {
-  const result = await db
-    .prepare("UPDATE subscribers SET status = 'unsubscribed' WHERE email = ?")
-    .bind(email)
-    .run();
+	const result = await db
+		.prepare("UPDATE subscribers SET status = 'unsubscribed' WHERE email = ?")
+		.bind(email)
+		.run();
 
-  return (result.meta?.changes ?? 0) > 0;
+	return (result.meta?.changes ?? 0) > 0;
 }
 
 // Long TTL because mutations invalidate explicitly; the TTL is a safety net.
@@ -78,88 +78,96 @@ const VERIFIED_CACHE_KEY = "subscribers-verified";
 const PARTICIPANTS_CACHE_KEY = "subscribers-participants";
 
 export async function getVerifiedSubscribers(
-  db: D1Database,
-  cache: KVNamespace,
+	db: D1Database,
+	cache: KVNamespace,
 ): Promise<{ email: string }[]> {
-  const cached = await cache.get<string[]>(VERIFIED_CACHE_KEY, "json");
-  if (cached) return cached.map((email) => ({ email }));
+	const cached = await cache.get<string[]>(VERIFIED_CACHE_KEY, "json");
+	if (cached) return cached.map((email) => ({ email }));
 
-  const { results } = await db
-    .prepare("SELECT email FROM subscribers WHERE status = 'verified'")
-    .all<{ email: string }>();
+	const { results } = await db
+		.prepare("SELECT email FROM subscribers WHERE status = 'verified'")
+		.all<{ email: string }>();
 
-  await cache.put(
-    VERIFIED_CACHE_KEY,
-    JSON.stringify(results.map((r) => r.email)),
-    { expirationTtl: LIST_CACHE_TTL_SECONDS },
-  );
-  return results;
+	await cache.put(
+		VERIFIED_CACHE_KEY,
+		JSON.stringify(results.map((r) => r.email)),
+		{ expirationTtl: LIST_CACHE_TTL_SECONDS },
+	);
+	return results;
 }
 
 export async function getParticipants(
-  db: D1Database,
-  cache: KVNamespace,
+	db: D1Database,
+	cache: KVNamespace,
 ): Promise<{ email: string }[]> {
-  const cached = await cache.get<string[]>(PARTICIPANTS_CACHE_KEY, "json");
-  if (cached) return cached.map((email) => ({ email }));
+	const cached = await cache.get<string[]>(PARTICIPANTS_CACHE_KEY, "json");
+	if (cached) return cached.map((email) => ({ email }));
 
-  const { results } = await db
-    .prepare(
-      "SELECT email FROM subscribers WHERE status = 'verified' AND is_participant = 1"
-    )
-    .all<{ email: string }>();
+	const { results } = await db
+		.prepare(
+			"SELECT email FROM subscribers WHERE status = 'verified' AND is_participant = 1",
+		)
+		.all<{ email: string }>();
 
-  await cache.put(
-    PARTICIPANTS_CACHE_KEY,
-    JSON.stringify(results.map((r) => r.email)),
-    { expirationTtl: LIST_CACHE_TTL_SECONDS },
-  );
-  return results;
+	await cache.put(
+		PARTICIPANTS_CACHE_KEY,
+		JSON.stringify(results.map((r) => r.email)),
+		{ expirationTtl: LIST_CACHE_TTL_SECONDS },
+	);
+	return results;
 }
 
 export async function markAsParticipant(
-  db: D1Database,
-  email: string
+	db: D1Database,
+	email: string,
 ): Promise<void> {
-  await db
-    .prepare("UPDATE subscribers SET is_participant = 1 WHERE email = ?")
-    .bind(email)
-    .run();
+	await db
+		.prepare("UPDATE subscribers SET is_participant = 1 WHERE email = ?")
+		.bind(email)
+		.run();
 }
 
 export interface Subscriber {
-  id: number;
-  email: string;
-  status: string;
-  is_participant: number;
-  created_at: string;
-  verified_at: string | null;
+	id: number;
+	email: string;
+	status: string;
+	is_participant: number;
+	created_at: string;
+	verified_at: string | null;
 }
 
 export async function getSubscribers(
-  db: D1Database,
-  page: number,
-  perPage: number
+	db: D1Database,
+	page: number,
+	perPage: number,
 ): Promise<{ subscribers: Subscriber[]; total: number }> {
-  const offset = (page - 1) * perPage;
+	const offset = (page - 1) * perPage;
 
-  const total = await db
-    .prepare("SELECT COUNT(*) as count FROM subscribers")
-    .first<{ count: number }>();
+	const total = await db
+		.prepare("SELECT COUNT(*) as count FROM subscribers")
+		.first<{ count: number }>();
 
-  const { results } = await db
-    .prepare(
-      "SELECT id, email, status, is_participant, created_at, verified_at FROM subscribers ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    )
-    .bind(perPage, offset)
-    .all<Subscriber>();
+	const { results } = await db
+		.prepare(
+			"SELECT id, email, status, is_participant, created_at, verified_at FROM subscribers ORDER BY created_at DESC LIMIT ? OFFSET ?",
+		)
+		.bind(perPage, offset)
+		.all<Subscriber>();
 
-  return { subscribers: results, total: total?.count ?? 0 };
+	return { subscribers: results, total: total?.count ?? 0 };
+}
+
+export async function getSubscriberEmails(db: D1Database): Promise<string[]> {
+	const { results } = await db
+		.prepare("SELECT email FROM subscribers ORDER BY email ASC")
+		.all<{ email: string }>();
+
+	return results.map((subscriber) => subscriber.email);
 }
 
 interface SubscriberCount {
-  total: number;
-  verified: number;
+	total: number;
+	verified: number;
 }
 
 const COUNT_CACHE_KEY = "subscriber-count";
@@ -168,75 +176,92 @@ const COUNT_CACHE_KEY = "subscriber-count";
 const COUNT_CACHE_TTL_SECONDS = 60 * 60 * 24;
 
 export async function getSubscriberCount(
-  db: D1Database,
-  cache: KVNamespace,
+	db: D1Database,
+	cache: KVNamespace,
 ): Promise<SubscriberCount> {
-  const cached = await cache.get<SubscriberCount>(COUNT_CACHE_KEY, "json");
-  if (cached) return cached;
+	const cached = await cache.get<SubscriberCount>(COUNT_CACHE_KEY, "json");
+	if (cached) return cached;
 
-  // One pass instead of two COUNT(*) scans.
-  const row = await db
-    .prepare(
-      "SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) AS verified FROM subscribers"
-    )
-    .first<{ total: number; verified: number | null }>();
+	// One pass instead of two COUNT(*) scans.
+	const row = await db
+		.prepare(
+			"SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'verified' THEN 1 ELSE 0 END) AS verified FROM subscribers",
+		)
+		.first<{ total: number; verified: number | null }>();
 
-  const counts: SubscriberCount = {
-    total: row?.total ?? 0,
-    verified: row?.verified ?? 0,
-  };
-  await cache.put(COUNT_CACHE_KEY, JSON.stringify(counts), {
-    expirationTtl: COUNT_CACHE_TTL_SECONDS,
-  });
-  return counts;
+	const counts: SubscriberCount = {
+		total: row?.total ?? 0,
+		verified: row?.verified ?? 0,
+	};
+	await cache.put(COUNT_CACHE_KEY, JSON.stringify(counts), {
+		expirationTtl: COUNT_CACHE_TTL_SECONDS,
+	});
+	return counts;
 }
 
-export async function invalidateSubscriberCount(cache: KVNamespace): Promise<void> {
-  await cache.delete(COUNT_CACHE_KEY);
+export async function invalidateSubscriberCount(
+	cache: KVNamespace,
+): Promise<void> {
+	await cache.delete(COUNT_CACHE_KEY);
 }
 
-export async function invalidateVerifiedList(cache: KVNamespace): Promise<void> {
-  await cache.delete(VERIFIED_CACHE_KEY);
+export async function invalidateVerifiedList(
+	cache: KVNamespace,
+): Promise<void> {
+	await cache.delete(VERIFIED_CACHE_KEY);
 }
 
-export async function invalidateParticipantsList(cache: KVNamespace): Promise<void> {
-  await cache.delete(PARTICIPANTS_CACHE_KEY);
+export async function invalidateParticipantsList(
+	cache: KVNamespace,
+): Promise<void> {
+	await cache.delete(PARTICIPANTS_CACHE_KEY);
 }
 
 export async function deleteSubscriber(
-  db: D1Database,
-  id: number
+	db: D1Database,
+	id: number,
 ): Promise<boolean> {
-  const result = await db
-    .prepare("DELETE FROM subscribers WHERE id = ?")
-    .bind(id)
-    .run();
+	const result = await db
+		.prepare("DELETE FROM subscribers WHERE id = ?")
+		.bind(id)
+		.run();
 
-  return (result.meta?.changes ?? 0) > 0;
+	return (result.meta?.changes ?? 0) > 0;
 }
 
-export async function generateUnsubscribeToken(email: string, secret: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(email));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+export async function generateUnsubscribeToken(
+	email: string,
+	secret: string,
+): Promise<string> {
+	const key = await crypto.subtle.importKey(
+		"raw",
+		new TextEncoder().encode(secret),
+		{ name: "HMAC", hash: "SHA-256" },
+		false,
+		["sign"],
+	);
+	const sig = await crypto.subtle.sign(
+		"HMAC",
+		key,
+		new TextEncoder().encode(email),
+	);
+	return btoa(String.fromCharCode(...new Uint8Array(sig)));
 }
 
-export async function verifyUnsubscribeToken(email: string, token: string, secret: string): Promise<boolean> {
-  const expected = await generateUnsubscribeToken(email, secret);
-  return expected === token;
+export async function verifyUnsubscribeToken(
+	email: string,
+	token: string,
+	secret: string,
+): Promise<boolean> {
+	const expected = await generateUnsubscribeToken(email, secret);
+	return expected === token;
 }
 
 // Internal addresses (our own from/reply-to inboxes, test accounts) should
 // never be disabled by the strike system — a transient failure on these
 // must not lock us out of our own list.
 function isInternalAddress(email: string): boolean {
-  return email.toLowerCase().endsWith("@sideprojectsaturday.com");
+	return email.toLowerCase().endsWith("@sideprojectsaturday.com");
 }
 
 /**
@@ -246,52 +271,54 @@ function isInternalAddress(email: string): boolean {
  * Returns true iff this call caused the row to be disabled.
  */
 export async function recordEmailStrike(
-  db: D1Database,
-  email: string,
+	db: D1Database,
+	email: string,
 ): Promise<boolean> {
-  if (isInternalAddress(email)) return false;
+	if (isInternalAddress(email)) return false;
 
-  const row = await db
-    .prepare(
-      `UPDATE subscribers
+	const row = await db
+		.prepare(
+			`UPDATE subscribers
        SET strikes = strikes + 1,
            status = CASE WHEN strikes + 1 >= 3 AND status = 'verified' THEN 'disabled' ELSE status END
        WHERE email = ?
        RETURNING status, strikes`,
-    )
-    .bind(email)
-    .first<{ status: string; strikes: number }>();
+		)
+		.bind(email)
+		.first<{ status: string; strikes: number }>();
 
-  // strikes can only go up (clearEmailStrikes sets to 0; status only flips
-  // here), so a row with status='disabled' AND strikes===3 is one we just
-  // transitioned. >3 means we'd already disabled them on a prior call.
-  return row?.status === "disabled" && row.strikes === 3;
+	// strikes can only go up (clearEmailStrikes sets to 0; status only flips
+	// here), so a row with status='disabled' AND strikes===3 is one we just
+	// transitioned. >3 means we'd already disabled them on a prior call.
+	return row?.status === "disabled" && row.strikes === 3;
 }
 
 /** Clear any accumulated strikes for an email after a successful delivery. */
 export async function clearEmailStrikes(
-  db: D1Database,
-  email: string,
+	db: D1Database,
+	email: string,
 ): Promise<void> {
-  if (isInternalAddress(email)) return;
+	if (isInternalAddress(email)) return;
 
-  await db
-    .prepare("UPDATE subscribers SET strikes = 0 WHERE email = ? AND strikes > 0")
-    .bind(email)
-    .run();
+	await db
+		.prepare(
+			"UPDATE subscribers SET strikes = 0 WHERE email = ? AND strikes > 0",
+		)
+		.bind(email)
+		.run();
 }
 
 /** Delete pending subscribers whose verification expired. */
 export async function cleanupExpiredPending(
-  db: D1Database,
-  maxAgeHours: number = 2
+	db: D1Database,
+	maxAgeHours: number = 2,
 ): Promise<number> {
-  const result = await db
-    .prepare(
-      "DELETE FROM subscribers WHERE status = 'pending' AND created_at < datetime('now', ?)"
-    )
-    .bind(`-${maxAgeHours} hours`)
-    .run();
+	const result = await db
+		.prepare(
+			"DELETE FROM subscribers WHERE status = 'pending' AND created_at < datetime('now', ?)",
+		)
+		.bind(`-${maxAgeHours} hours`)
+		.run();
 
-  return result.meta?.changes ?? 0;
+	return result.meta?.changes ?? 0;
 }

@@ -2,7 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import { actions } from "astro:actions";
 import { isAdmin } from "@/lib/auth";
-import { getSubscribers } from "@/lib/subscribers";
+import { getSubscriberEmails, getSubscribers } from "@/lib/subscribers";
 import { env } from "cloudflare:workers";
 
 const authenticated = isAdmin(Astro.request);
@@ -14,17 +14,31 @@ const deleteResult = Astro.getActionResult(actions.admin.deleteSubscriber);
 
 const PER_PAGE = 25;
 const page = Math.max(1, Number(Astro.url.searchParams.get("page")) || 1);
-const { subscribers, total } = await getSubscribers(env.DB, page, PER_PAGE);
+const [{ subscribers, total }, subscriberEmails] = await Promise.all([
+  getSubscribers(env.DB, page, PER_PAGE),
+  getSubscriberEmails(env.DB),
+]);
 const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 ---
 
 <Layout title="Users — Side Project Saturday" windowTitle="Users" wide>
   <div>
     <h1>Users</h1>
-    <p style="margin-bottom: 12px;">
-      {total} subscriber{total !== 1 && "s"}
-      <a href="/admin" style="margin-left: 12px;">← admin</a>
-    </p>
+    <div class="users-header">
+      <p>
+        {total} subscriber{total !== 1 && "s"}
+        <a href="/admin" style="margin-left: 12px;">← admin</a>
+      </p>
+      <button
+        type="button"
+        class="btn btn-sm copy-emails-btn"
+        data-emails={JSON.stringify(subscriberEmails)}
+        disabled={subscriberEmails.length === 0}
+      >
+        Copy all emails
+      </button>
+      <span class="copy-status" aria-live="polite"></span>
+    </div>
 
     {deleteResult?.data && <div class="message success">{deleteResult.data.message}</div>}
     {deleteResult?.error && <div class="message error">{deleteResult.error.message}</div>}
@@ -83,7 +97,40 @@ const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   </div>
 </Layout>
 
+<script>
+  const copyButton = document.querySelector<HTMLButtonElement>(".copy-emails-btn");
+  const copyStatus = document.querySelector<HTMLElement>(".copy-status");
+
+  copyButton?.addEventListener("click", async () => {
+    const emails = JSON.parse(copyButton.dataset.emails ?? "[]") as string[];
+
+    try {
+      await navigator.clipboard.writeText(emails.join("\n"));
+      if (copyStatus) copyStatus.textContent = `Copied ${emails.length} email${emails.length === 1 ? "" : "s"}`;
+    } catch {
+      if (copyStatus) copyStatus.textContent = "Copy failed";
+    }
+  });
+</script>
+
 <style>
+  .users-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .users-header p {
+    margin: 0;
+    margin-right: auto;
+  }
+
+  .copy-status {
+    font-size: 12px;
+    color: #666;
+  }
+
   .users-table {
     width: 100%;
     border-collapse: collapse;
