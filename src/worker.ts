@@ -10,13 +10,11 @@ import {
   wednesdayAnnouncement,
   wednesdayCancellation,
   fridayReminder,
-  sundayRecap,
 } from "./email/templates";
-import { getCurrentSaturday, getPreviousSaturday, dateKeyToSlug } from "./lib/dates";
-import { ensureEvent, isEventCancelled, eventImageKey } from "./lib/events";
+import { getCurrentSaturday } from "./lib/dates";
+import { ensureEvent, isEventCancelled } from "./lib/events";
 import {
   getVerifiedSubscribers,
-  getParticipants,
   cleanupExpiredPending,
   invalidateSubscriberCount,
   invalidateVerifiedList,
@@ -24,11 +22,6 @@ import {
   recordEmailStrike,
   clearEmailStrikes,
 } from "./lib/subscribers";
-
-function getEventDO(env: Env, slug: string) {
-  const id = env.EVENT_DO.idFromName(slug);
-  return env.EVENT_DO.get(id) as DurableObjectStub<EventDO>;
-}
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -96,22 +89,11 @@ export default {
         await ensureEvent(env.DB, saturdayKey);
         const cancelled = await isEventCancelled(env.DB, saturdayKey);
 
-        const lastWeekKey = getPreviousSaturday(saturdayKey);
-        const lastWeekSlug = dateKeyToSlug(lastWeekKey);
-        const lastWeekStub = getEventDO(env, lastWeekSlug);
-        const lastWeekSubmissions = await lastWeekStub.getPublicSubmissions();
-
         const subscribers = await getVerifiedSubscribers(env.DB, env.CACHE);
 
         const template = cancelled
           ? wednesdayCancellation(saturdayKey, env.SITE_URL)
-          : wednesdayAnnouncement(
-              saturdayKey,
-              env.EVENT_ADDRESS,
-              env.SITE_URL,
-              lastWeekSubmissions,
-              lastWeekKey,
-            );
+          : wednesdayAnnouncement(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
         await sendInBatches({ env, recipients: subscribers, template, ...strikeHandlers });
       } else if (cron === "0 13 * * FRI") {
@@ -127,29 +109,6 @@ export default {
         const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
         await sendInBatches({ env, recipients: subscribers, template, ...strikeHandlers });
-      } else if (cron === "0 16 * * SUN") {
-        // Sunday: recap to participants only
-        // On Sunday, yesterday was Saturday
-        const recapKey = (() => {
-          const day = now.getUTCDay();
-          if (day === 0) {
-            const sat = new Date(now);
-            sat.setUTCDate(sat.getUTCDate() - 1);
-            return sat.toISOString().slice(0, 10);
-          }
-          return saturdayKey;
-        })();
-        const recapSlug = dateKeyToSlug(recapKey);
-
-        const stub = getEventDO(env, recapSlug);
-        const submissions = await stub.getSubmissions();
-        const imageKey = eventImageKey(recapSlug);
-        const hasImage = await env.IMAGES_BUCKET.head(imageKey) !== null;
-
-        const participants = await getParticipants(env.DB, env.CACHE);
-        const template = sundayRecap(recapKey, submissions, hasImage ? imageKey : null, env.SITE_URL);
-
-        await sendInBatches({ env, recipients: participants, template, ...strikeHandlers });
       }
       await invalidateListsIfNeeded();
       console.log(`[scheduled] ok cron="${cron}"`);

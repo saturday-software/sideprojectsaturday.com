@@ -60,11 +60,6 @@ export function getUpcomingSaturdays(count: number, startHour: number = 12, now:
   return results;
 }
 
-/** Get the previous Saturday relative to a given date key. */
-export function getPreviousSaturday(dateKey: string): string {
-  return addDays(dateKey, -7);
-}
-
 /** Get the next Saturday relative to a given date key. */
 export function getNextSaturday(dateKey: string): string {
   return addDays(dateKey, 7);
@@ -90,18 +85,6 @@ export function slugToDateKey(slug: string): string {
   return `${year}-${mm}-${dd}`;
 }
 
-/** Get today's date key in NY time. */
-export function todayDateKey(now: Date = new Date()): string {
-  const { y, m, d } = nyParts(now);
-  return pad(y, m, d);
-}
-
-/** Check if a date key falls on a Saturday. */
-export function isSaturday(dateKey: string): boolean {
-  const [y, m, d] = dateKey.split("-").map(Number);
-  return new Date(y, m - 1, d).getDay() === 6;
-}
-
 /** Check if current time is within Saturday event hours (9am–12pm ET). */
 export function isWithinEventHours(now: Date = new Date()): boolean {
   const { weekday } = nyParts(now);
@@ -111,9 +94,4 @@ export function isWithinEventHours(now: Date = new Date()): boolean {
     10,
   );
   return hourNY >= 9 && hourNY < 12;
-}
-
-/** Check if submission window is open: only during the Saturday of the event in ET (closes at end of day Saturday). */
-export function isSubmissionOpen(saturdayKey: string, now: Date = new Date()): boolean {
-  return isSaturday(saturdayKey) && todayDateKey(now) === saturdayKey;
 }

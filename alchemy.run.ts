@@ -66,7 +66,7 @@ const PROD = {
   d1DatabaseId: "fbd35c52-b517-47b8-9569-c372022d64da",
   kvCacheNamespaceId: "57a569810f7842b59e61b4135e2079e1",
   r2ImagesBucket: "sps-images",
-  crons: ["0 13 * * WED", "0 13 * * FRI", "0 16 * * SUN"],
+  crons: ["0 13 * * WED", "0 13 * * FRI"],
   /**
    * Worker secrets, as live on `side-project` (checked with
    * `cf workers secrets list` on 2026-11-11). Alchemy doesn't know
@@ -78,7 +78,6 @@ const PROD = {
   secrets: [
     "ADMIN_PASSWORD",
     "BSKY_APP_PASSWORD",
-    "SHARE_SEED",
     "SWITCHBOT_TOKEN",
     "SWITCHBOT_KEY",
     "SWITCHBOT_DEVICE_ID",
@@ -230,7 +229,7 @@ export default Alchemy.Stack(
         EVENT_DO: Cloudflare.DurableObject("EventDO"),
         MAILBOX_DO: Cloudflare.DurableObject("MailboxDO"),
         // No EMAIL binding: a preview can't send email at all. No secrets:
-        // admin login, share codes, unsubscribe links and the door buzzer
+        // admin login, unsubscribe links and the door buzzer
         // don't work in previews.
       },
       // No cron triggers: the crons email every subscriber.

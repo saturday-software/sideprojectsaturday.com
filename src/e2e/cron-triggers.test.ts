@@ -35,14 +35,4 @@ describe("e2e: cron triggers", () => {
     expect(emailBody).toContain("tomorrow");
   });
 
-  test("Sunday cron sends recap email to participants", async () => {
-    const email = `cron-sun-${Date.now()}@example.com`;
-    await commands.seedVerifiedSubscriber(email, true);
-
-    const status = await commands.triggerCron("0 16 * * SUN");
-    expect(status).toBe(200);
-
-    const emailBody = await commands.waitForSentEmail(15_000);
-    expect(emailBody).toContain("Recap");
-  });
 });

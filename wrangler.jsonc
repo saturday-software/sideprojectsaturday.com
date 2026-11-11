@@ -72,7 +72,7 @@
     },
   ],
   "triggers": {
-    "crons": ["0 13 * * WED", "0 13 * * FRI", "0 16 * * SUN"],
+    "crons": ["0 13 * * WED", "0 13 * * FRI"],
   },
   "vars": {
     "SITE_URL": "https://sideprojectsaturday.com",

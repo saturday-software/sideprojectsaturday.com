@@ -1,6 +1,5 @@
-import { formatEventDate, dateKeyToSlug } from "@/lib/dates";
+import { formatEventDate } from "@/lib/dates";
 import { getGoogleCalendarUrl, getIcsUrl } from "@/lib/calendar";
-import type { PublicSubmission, Submission } from "@/do/EventDO";
 
 function calendarLinksHtml(siteUrl: string, dateKey: string, address: string): string {
   const ics = getIcsUrl(siteUrl, dateKey);
@@ -100,30 +99,8 @@ export function wednesdayAnnouncement(
   dateKey: string,
   address: string,
   siteUrl: string,
-  lastWeekSubmissions: PublicSubmission[],
-  lastWeekDate: string,
 ): { subject: string; html: string; text: string } {
   const eventDate = formatEventDate(dateKey);
-
-  let recapSection = "";
-  let recapText = "";
-  if (lastWeekSubmissions.length > 0) {
-    const items = lastWeekSubmissions
-      .map(
-        (s) =>
-          `<li><strong>${s.participant_name}</strong>${s.description ? ` — ${s.description}` : ""}</li>`,
-      )
-      .join("\n");
-    recapSection = `
-      <h3>Last Week's Projects</h3>
-      <ul>${items}</ul>
-      <p><a href="${siteUrl}/events/${dateKeyToSlug(lastWeekDate)}" style="color: #000000;">View full recap →</a></p>
-    `;
-    const textItems = lastWeekSubmissions
-      .map((s) => `- ${s.participant_name}${s.description ? `: ${s.description}` : ""}`)
-      .join("\n");
-    recapText = `\nLast Week's Projects:\n${textItems}\nFull recap: ${siteUrl}/events/${dateKeyToSlug(lastWeekDate)}\n`;
-  }
 
   return {
     subject: "Side Project Saturday this week",
@@ -133,7 +110,6 @@ export function wednesdayAnnouncement(
       <p>${address}</p>
       ${calendarLinksHtml(siteUrl, dateKey, address)}
       <p>Come work on your side projects and share what you've been building!</p>
-      ${recapSection}
       ${footer(siteUrl)}
     `),
     text: `Side Project Saturday
@@ -143,8 +119,7 @@ ${address}
 
 ${calendarLinksText(siteUrl, dateKey, address)}
 
-Come work on your side projects and share what you've been building!
-${recapText}${textFooter(siteUrl)}`,
+Come work on your side projects and share what you've been building!${textFooter(siteUrl)}`,
   };
 }
 
@@ -194,87 +169,5 @@ ${address}
 ${calendarLinksText(siteUrl, dateKey, address)}
 
 You can buzz yourself into the building with ${siteUrl}/buzz or press the buzzer for Val.town and I'll let you in.${textFooter(siteUrl)}`,
-  };
-}
-
-export function sundayRecap(
-  dateKey: string,
-  submissions: Submission[],
-  imageKey: string | null,
-  siteUrl: string,
-): { subject: string; html: string; text: string } {
-  const eventDate = formatEventDate(dateKey);
-  const eventUrl = `${siteUrl}/events/${dateKeyToSlug(dateKey)}`;
-
-  let imageSection = "";
-  if (imageKey) {
-    imageSection = `<img src="${siteUrl}/api/image/${imageKey}" alt="Event photo" style="max-width: 100%; margin-bottom: 16px;">`;
-  }
-
-  const projects = submissions.filter((s) => s.description.trim() !== "");
-
-  let participantsSection = "";
-  let participantsText = "";
-  if (submissions.length > 0) {
-    const names = submissions.map((s) => s.participant_name).join(", ");
-    participantsSection = `
-      <h3>Participants</h3>
-      <p>${names}</p>
-    `;
-    participantsText = `Participants:\n${names}\n`;
-  }
-
-  let projectsSection = "";
-  let projectsText = "";
-  if (projects.length > 0) {
-    const items = projects
-      .map(
-        (s) => `
-        <div style="margin-bottom: 12px; padding: 12px; border: 1px solid #000000;">
-          <strong>${s.participant_name}</strong>
-          <p style="margin: 4px 0;">${s.description}</p>
-          ${s.contact_info ? `<p style="margin: 4px 0; color: #666;">Contact: ${s.contact_info}</p>` : ""}
-          ${s.private_details ? `<p style="margin: 0; color: #666; font-style: italic;">${s.private_details}</p>` : ""}
-        </div>
-      `,
-      )
-      .join("\n");
-    projectsSection = `<h3>Projects</h3>${items}`;
-
-    const textItems = projects
-      .map((s) => {
-        let entry = `- ${s.participant_name}: ${s.description}`;
-        if (s.contact_info) entry += `\n  Contact: ${s.contact_info}`;
-        return entry;
-      })
-      .join("\n");
-    projectsText = `\nProjects:\n${textItems}\n`;
-  }
-
-  const emptyHtml =
-    submissions.length === 0
-      ? "<p>No one shared their attendance this week.</p>"
-      : "";
-  const emptyText =
-    submissions.length === 0 ? "No one shared their attendance this week." : "";
-
-  return {
-    subject: "Side Project Saturday recap",
-    html: layout(`
-      <h2>This Week's Recap</h2>
-      <p><strong>${eventDate}</strong></p>
-      ${imageSection}
-      ${participantsSection}
-      ${projectsSection}
-      ${emptyHtml}
-      <p><a href="${eventUrl}" style="color: #000000;">View on the site →</a></p>
-      ${footer(siteUrl)}
-    `),
-    text: `Side Project Saturday Recap
-
-${eventDate}
-
-${participantsText}${projectsText}${emptyText}
-View on the site: ${eventUrl}${textFooter(siteUrl)}`,
   };
 }

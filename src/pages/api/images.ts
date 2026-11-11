@@ -1,6 +1,5 @@
 import type { APIRoute } from "astro";
 import { isAdmin } from "@/lib/auth";
-import { parseEventImageKey, recordEventImageDelete } from "@/lib/events";
 import { env } from "cloudflare:workers";
 
 export const GET: APIRoute = async ({ request }) => {
@@ -43,11 +42,6 @@ export const DELETE: APIRoute = async ({ request }) => {
   }
 
   await env.IMAGES_BUCKET.delete(key);
-
-  const eventSlug = parseEventImageKey(key);
-  if (eventSlug) {
-    await recordEventImageDelete(env.CACHE, env.IMAGES_BUCKET, eventSlug);
-  }
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" },

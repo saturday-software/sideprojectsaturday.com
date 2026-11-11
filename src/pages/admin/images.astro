@@ -77,12 +77,6 @@ if (!authenticated) {
   }
 
   function formatSource(source: string): string {
-    const match = source.match(/^(event|submission):(.+)$/);
-    if (match) {
-      const [, type, slug] = match;
-      const label = type === "event" ? `event ${slug}` : `submission ${slug}`;
-      return `<a href="/events/${slug}" class="image-source-link">${label}</a>`;
-    }
     return `<span>${source}</span>`;
   }
 
@@ -218,10 +212,6 @@ if (!authenticated) {
     padding: 0 4px;
     border: 1px solid #ccc;
     font-size: 10px;
-  }
-
-  .image-source-link {
-    color: #000;
   }
 
   .image-actions {

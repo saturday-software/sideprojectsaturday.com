@@ -2,9 +2,8 @@
 import Layout from "@/layouts/Layout.astro";
 import { actions } from "astro:actions";
 import { isAdmin } from "@/lib/auth";
-import { getUpcomingSaturdays, dateKeyToSlug, todayDateKey, isSaturday } from "@/lib/dates";
+import { getUpcomingSaturdays } from "@/lib/dates";
 import { ensureEvent, isEventCancelled } from "@/lib/events";
-import { generateShareCode } from "@/lib/share";
 import { getSubscriberCount } from "@/lib/subscribers";
 import { getRules, dayName, formatTime, type DoorRule } from "@/lib/door";
 import type { MailboxDO } from "@/do/MailboxDO";
@@ -28,7 +27,6 @@ const error = loginResult?.error?.message ?? cancelResult?.error?.message ?? doo
 const WEEKS_AHEAD = 4;
 
 let events: { date: string; cancelled: boolean }[] = [];
-let shareCode = "";
 let subscriberCount = { total: 0, verified: 0 };
 let doorRules: DoorRule[] = [];
 let unreadCount = 0;
@@ -42,10 +40,6 @@ if (authenticated) {
     events.push({ date, cancelled });
   }
 
-  const nextActive = events.find((e) => !e.cancelled)?.date ?? saturdays[0];
-  const today = todayDateKey();
-  const shareCodeDate = isSaturday(today) ? today : nextActive;
-  shareCode = await generateShareCode(env.SHARE_SEED, shareCodeDate);
   subscriberCount = await getSubscriberCount(env.DB, env.CACHE);
   doorRules = await getRules(env.DB);
 
@@ -196,9 +190,6 @@ if (authenticated) {
 
       <section>
         <h2>Links</h2>
-        <p style="margin-bottom: 4px;"><a href={`/share/${shareCode}`}>share page →</a></p>
-        <p style="margin-bottom: 4px;"><a href={`/share/${shareCode}/qr`}>share QR code →</a></p>
-        <p style="margin-bottom: 4px;"><a href={`/events/${dateKeyToSlug(events[0]?.date)}`}>event page →</a></p>
         <p style="margin-bottom: 0;"><a href="/admin/images">manage images →</a></p>
       </section>
     </div>

@@ -9,17 +9,14 @@ import {
   wednesdayAnnouncement,
   wednesdayCancellation,
   fridayReminder,
-  sundayRecap,
 } from "@/email/templates";
-import { getCurrentSaturday, dateKeyToSlug } from "@/lib/dates";
-import { eventImageKey } from "@/lib/events";
+import { getCurrentSaturday } from "@/lib/dates";
 
 const TEMPLATES = [
   "verification",
   "wednesday-announcement",
   "wednesday-cancellation",
   "friday-reminder",
-  "sunday-recap",
 ] as const;
 
 type Template = (typeof TEMPLATES)[number];
@@ -69,7 +66,6 @@ const dateKey = values.date ?? getCurrentSaturday();
 const siteUrl = "https://sideprojectsaturday.com";
 const address = "325 Gold St #503";
 const from = "hello@sideprojectsaturday.com";
-const shareSeed = "dev-seed-change-in-prod";
 
 async function generate(): Promise<{ subject: string; html: string }> {
   switch (template) {
@@ -77,10 +73,7 @@ async function generate(): Promise<{ subject: string; html: string }> {
       return verificationEmail(siteUrl, "test-token-abc123");
 
     case "wednesday-announcement":
-      return wednesdayAnnouncement(dateKey, address, siteUrl, [
-        { id: 1, participant_name: "Alice", description: "Built a weather CLI in Rust" },
-        { id: 2, participant_name: "Bob", description: "Designed a logo for my podcast" },
-      ], dateKey);
+      return wednesdayAnnouncement(dateKey, address, siteUrl);
 
     case "wednesday-cancellation":
       return wednesdayCancellation(dateKey, siteUrl);
@@ -88,13 +81,6 @@ async function generate(): Promise<{ subject: string; html: string }> {
     case "friday-reminder":
       return fridayReminder(dateKey, address, siteUrl);
 
-    case "sunday-recap":
-      return sundayRecap(dateKey, [
-        { id: 1, email: "alice@example.com", participant_name: "Alice", description: "Built a weather CLI in Rust", contact_info: "@alice", private_details: "", submitted_at: new Date().toISOString() },
-        { id: 2, email: "bob@example.com", participant_name: "Bob", description: "Designed a logo for my podcast", contact_info: "", private_details: "Looking for a co-founder", submitted_at: new Date().toISOString() },
-        { id: 3, email: "charlie@example.com", participant_name: "Charlie", description: "Shipped v1 of my budgeting app", contact_info: "charlie@example.com", private_details: "", submitted_at: new Date().toISOString() },
-        { id: 4, email: "dana@example.com", participant_name: "Dana", description: "", contact_info: "", private_details: "", submitted_at: new Date().toISOString() },
-      ], eventImageKey(dateKeyToSlug(dateKey)), siteUrl);
   }
 }
 
