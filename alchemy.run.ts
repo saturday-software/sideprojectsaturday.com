@@ -19,7 +19,7 @@
  * `email` handlers.
  */
 import * as Alchemy from "alchemy";
-import * as Cloudflare from "alchemy/Cloudflare";
+import * as Cloudflare from "@alchemy.run/cloudflare";
 import * as Command from "alchemy/Command";
 import * as Output from "alchemy/Output";
 import * as Effect from "effect/Effect";
@@ -69,8 +69,10 @@ const PROD = {
   crons: ["0 13 * * WED", "0 13 * * FRI", "0 16 * * SUN"],
   /**
    * Worker secrets, set with `wrangler secret put`. Alchemy doesn't know
-   * their values and a script upload replaces all bindings, so prod binds
-   * each one as `inherit`: Cloudflare copies it from the live version.
+   * their values, so prod binds each one as `inherit`: Cloudflare copies it
+   * from the latest uploaded version. (Alchemy notes that Cloudflare also
+   * keeps secrets an upload omits; `inherit` makes it explicit. Alchemy only
+   * deletes secrets it uploaded itself, so it never deletes these.)
    */
   secrets: [
     "ADMIN_PASSWORD",
@@ -104,7 +106,8 @@ const observability = {
 const state = Layer.unwrap(
   Effect.gen(function* () {
     const dev = yield* Alchemy.ALCHEMY_DEV.pipe(Effect.orDie);
-    return dev ? Alchemy.localState() : Cloudflare.state();
+    // Pinned, so the state store is never read or deployed in another account.
+    return dev ? Alchemy.localState() : Cloudflare.state({ accountId: ACCOUNT_ID });
   }),
 );
 
