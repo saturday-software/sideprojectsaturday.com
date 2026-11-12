@@ -1,0 +1,159 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import MarkdownEditor from "@/components/MarkdownEditor.astro";
+import { actions } from "astro:actions";
+import { isAdmin } from "@/lib/auth";
+import { getSubscriberCount } from "@/lib/subscribers";
+import { env } from "cloudflare:workers";
+
+if (!isAdmin(Astro.request)) {
+  return Astro.redirect("/admin");
+}
+
+const result = Astro.getActionResult(actions.admin.sendBroadcast);
+const message = result?.data?.message;
+const error = result?.error?.message;
+// A successful send to everyone clears the saved draft; anything else keeps it.
+const sentToAll = result?.data?.mode === "all";
+
+const { verified } = await getSubscriberCount(env.DB, env.CACHE);
+---
+
+<Layout title="Compose — Side Project Saturday" windowTitle="Compose email" wide>
+  <div class="compose">
+    <p style="margin-bottom: 12px;">
+      Goes to <strong>{verified}</strong> verified subscriber{verified === 1 ? "" : "s"} from {env.FROM_EMAIL}.
+      <a href="/admin" style="margin-left: 12px;">← admin</a>
+    </p>
+
+    {message && <div class="message success">{message}</div>}
+    {error && <div class="message error">{error}</div>}
+
+    <form method="POST" action={actions.admin.sendBroadcast} id="compose-form" data-sent-to-all={sentToAll ? "1" : ""}>
+      <label>
+        Subject
+        <input type="text" name="subject" id="compose-subject" required autocomplete="off" />
+      </label>
+
+      <MarkdownEditor name="markdown" id="compose-editor" label="Body" uploadSource="broadcast" />
+      <p class="hint">Supports **bold**, _italic_, [links](https://…) and images (drag or paste). An unsubscribe link is added at the bottom.</p>
+
+      <fieldset>
+        <legend>Send a test first</legend>
+        <div class="row">
+          <input type="email" name="testEmail" placeholder="you@example.com" />
+          <button type="submit" name="mode" value="test" class="btn" formnovalidate>Send test</button>
+        </div>
+      </fieldset>
+
+      <fieldset class="danger">
+        <legend>Send to everyone</legend>
+        <div class="row">
+          <input type="text" name="confirm" placeholder="type SEND" autocomplete="off" />
+          <button type="submit" name="mode" value="all" class="btn" id="send-all">Send to {verified} subscribers</button>
+        </div>
+      </fieldset>
+    </form>
+  </div>
+
+  <!-- Runs before the editor's module script so the editor picks up the restored draft. -->
+  <script is:inline>
+    (function () {
+      var KEY = "sps-compose-draft";
+      var form = document.getElementById("compose-form");
+      var subject = document.getElementById("compose-subject");
+      var body = document.getElementById("compose-editor-hidden");
+      if (form.dataset.sentToAll) {
+        localStorage.removeItem(KEY);
+      } else {
+        try {
+          var draft = JSON.parse(localStorage.getItem(KEY) || "null");
+          if (draft) {
+            subject.value = draft.subject || "";
+            body.value = draft.body || "";
+          }
+        } catch (e) {}
+      }
+      var lastEmail = localStorage.getItem(KEY + "-test-email");
+      if (lastEmail) form.elements.testEmail.value = lastEmail;
+
+      form.addEventListener("submit", function (e) {
+        if (e.submitter && e.submitter.value === "all") {
+          if (!confirm("Really send \"" + subject.value + "\"? (" + e.submitter.textContent + ")")) {
+            e.preventDefault();
+          }
+        }
+      });
+
+      // The editor copies its text into the hidden input in its own submit listener on the form.
+      // A bubble-phase listener on window runs after all of those, so the body is current here.
+      window.addEventListener("submit", function (e) {
+        if (e.target !== form || e.defaultPrevented) return;
+        var mode = e.submitter && e.submitter.value;
+        if (mode === "test" && form.elements.testEmail.value) {
+          localStorage.setItem(KEY + "-test-email", form.elements.testEmail.value);
+        }
+        localStorage.setItem(KEY, JSON.stringify({ subject: subject.value, body: body.value }));
+        form.querySelectorAll("button[type=submit]").forEach(function (b) {
+          // Disabling the submitter would drop its name/value from the form data, so defer it.
+          setTimeout(function () { b.disabled = true; }, 0);
+        });
+      });
+    })();
+  </script>
+</Layout>
+
+<style>
+  .compose {
+    max-width: 800px;
+  }
+
+  #compose-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  #compose-form label {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  #compose-form input {
+    font-size: 13px;
+    padding: 4px 6px;
+    font-family: inherit;
+  }
+
+  .hint {
+    font-size: 11px;
+    color: #666;
+    margin: 0;
+  }
+
+  fieldset {
+    border: 1px solid #000;
+    padding: 8px 12px 12px;
+  }
+
+  fieldset.danger {
+    border-color: #a00;
+  }
+
+  legend {
+    font-size: 12px;
+    padding: 0 4px;
+  }
+
+  .row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .row input {
+    flex: 1;
+  }
+</style>

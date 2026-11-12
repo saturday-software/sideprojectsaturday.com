@@ -5,6 +5,10 @@ import { requireAdmin } from "@/lib/auth";
 import { isEventCancelled, setEventCancelled } from "@/lib/events";
 import { addRule, deleteRule, toggleRule, toggleEventOnly } from "@/lib/door";
 import { switchbotPress } from "@/lib/switchbot";
+import { renderMarkdown, markdownToText } from "@/lib/render-markdown";
+import { broadcastEmail } from "@/email/templates";
+import { broadcastToSubscribers } from "@/email/broadcast";
+import { sendEmail } from "@/email/send";
 import {
   deleteSubscriber,
   invalidateSubscriberCount,
@@ -125,6 +129,50 @@ export const admin = {
       await invalidateVerifiedList(env.CACHE);
       await invalidateParticipantsList(env.CACHE);
       return { message: "Subscriber deleted" };
+    },
+  }),
+
+  sendBroadcast: defineAction({
+    accept: "form",
+    input: z.object({
+      subject: z.string().trim().min(1, "Subject is required"),
+      markdown: z.string().trim().min(1, "Body is required"),
+      // "test" sends a single copy to testEmail; "all" sends to every verified subscriber
+      mode: z.enum(["test", "all"]),
+      testEmail: z.string().trim().optional(),
+      confirm: z.string().optional(),
+    }),
+    handler: async ({ subject, markdown, mode, testEmail, confirm }, context) => {
+      requireAdmin(context.cookies);
+
+      const template = broadcastEmail(
+        subject,
+        renderMarkdown(markdown, { baseUrl: env.SITE_URL }),
+        markdownToText(markdown, { baseUrl: env.SITE_URL }),
+        env.SITE_URL,
+      );
+
+      if (mode === "test") {
+        const to = z.email().safeParse(testEmail);
+        if (!to.success) {
+          throw new ActionError({ code: "BAD_REQUEST", message: "Enter a valid address for the test send" });
+        }
+        await sendEmail(env.EMAIL, {
+          to: to.data,
+          from: env.FROM_EMAIL,
+          replyTo: env.FROM_EMAIL,
+          subject: `[TEST] ${template.subject}`,
+          html: template.html,
+          text: template.text,
+        }, env.MAILBOX_DO);
+        return { message: `Test sent to ${to.data}`, mode };
+      }
+
+      if (confirm !== "SEND") {
+        throw new ActionError({ code: "BAD_REQUEST", message: 'Type SEND to confirm sending to everyone' });
+      }
+      const count = await broadcastToSubscribers(env, template);
+      return { message: `Sent to ${count} subscriber${count === 1 ? "" : "s"}`, mode };
     },
   }),
 

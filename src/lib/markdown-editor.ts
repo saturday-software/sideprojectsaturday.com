@@ -341,7 +341,7 @@ export function createMarkdownEditor(root: HTMLElement, hidden: HTMLInputElement
 
   const view = new EditorView({
     state: EditorState.create({
-      doc: '\n\n',
+      doc: hidden.value || '\n\n',
       extensions: [
         markdownKeymap,
         basicSetup,

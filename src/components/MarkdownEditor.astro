@@ -4,8 +4,9 @@ interface Props {
   id?: string;
   label?: string;
   uploadSource?: string;
+  value?: string;
 }
-const { name, id = 'editor', label, uploadSource } = Astro.props;
+const { name, id = 'editor', label, uploadSource, value = '' } = Astro.props;
 ---
 
 <div class="markdown-editor-wrapper" data-editor-id={id} data-label={label}>
@@ -15,7 +16,7 @@ const { name, id = 'editor', label, uploadSource } = Astro.props;
       <button type="button" class="expand-btn" data-expand={id} aria-label="Expand">⤢</button>
     </div>
   )}
-  <input type="hidden" id={`${id}-hidden`} name={name} />
+  <input type="hidden" id={`${id}-hidden`} name={name} value={value} />
   <div id={id} class="markdown-editor" data-hidden={`${id}-hidden`} data-upload-source={uploadSource}></div>
 </div>
 

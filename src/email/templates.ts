@@ -49,6 +49,23 @@ function textFooter(siteUrl: string): string {
   return `\n--\nUnsubscribe: ${siteUrl}/unsubscribe`;
 }
 
+/** A one-off email written in the admin compose page. `bodyHtml` is already-rendered, trusted HTML. */
+export function broadcastEmail(
+  subject: string,
+  bodyHtml: string,
+  bodyText: string,
+  siteUrl: string,
+): { subject: string; html: string; text: string } {
+  return {
+    subject,
+    html: layout(`
+      ${bodyHtml}
+      ${footer(siteUrl)}
+    `),
+    text: `${bodyText}${textFooter(siteUrl)}`,
+  };
+}
+
 export function unsubscribeConfirmationEmail(
   siteUrl: string,
   email: string,

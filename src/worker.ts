@@ -5,7 +5,7 @@ export { EventDO, MailboxDO };
 import astroHandler from "@astrojs/cloudflare/entrypoints/server";
 import PostalMime from "postal-mime";
 
-import { sendInBatches } from "./email/batch-send";
+import { broadcastToSubscribers } from "./email/broadcast";
 import {
   wednesdayAnnouncement,
   wednesdayCancellation,
@@ -13,15 +13,7 @@ import {
 } from "./email/templates";
 import { getCurrentSaturday } from "./lib/dates";
 import { ensureEvent, isEventCancelled } from "./lib/events";
-import {
-  getVerifiedSubscribers,
-  cleanupExpiredPending,
-  invalidateSubscriberCount,
-  invalidateVerifiedList,
-  invalidateParticipantsList,
-  recordEmailStrike,
-  clearEmailStrikes,
-} from "./lib/subscribers";
+import { cleanupExpiredPending, invalidateSubscriberCount } from "./lib/subscribers";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -63,39 +55,16 @@ export default {
       const removed = await cleanupExpiredPending(env.DB);
       if (removed > 0) await invalidateSubscriberCount(env.CACHE);
 
-      let disabledAny = false;
-      const strikeHandlers = {
-        onRecipientFailure: async (email: string) => {
-          const disabled = await recordEmailStrike(env.DB, email);
-          if (disabled) {
-            disabledAny = true;
-            console.log(`[scheduled] disabled subscriber email="${email}" reason=3-strikes`);
-          }
-        },
-        onRecipientSuccess: async (email: string) => {
-          await clearEmailStrikes(env.DB, email);
-        },
-      };
-      const invalidateListsIfNeeded = async () => {
-        if (disabledAny) {
-          await invalidateVerifiedList(env.CACHE);
-          await invalidateParticipantsList(env.CACHE);
-          await invalidateSubscriberCount(env.CACHE);
-        }
-      };
-
       if (cron === "0 13 * * WED") {
         // Wednesday: announcement or cancellation
         await ensureEvent(env.DB, saturdayKey);
         const cancelled = await isEventCancelled(env.DB, saturdayKey);
 
-        const subscribers = await getVerifiedSubscribers(env.DB, env.CACHE);
-
         const template = cancelled
           ? wednesdayCancellation(saturdayKey, env.SITE_URL)
           : wednesdayAnnouncement(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
-        await sendInBatches({ env, recipients: subscribers, template, ...strikeHandlers });
+        await broadcastToSubscribers(env, template);
       } else if (cron === "0 13 * * FRI") {
         // Friday: reminder (if not cancelled)
         await ensureEvent(env.DB, saturdayKey);
@@ -105,12 +74,10 @@ export default {
           return;
         }
 
-        const subscribers = await getVerifiedSubscribers(env.DB, env.CACHE);
         const template = fridayReminder(saturdayKey, env.EVENT_ADDRESS, env.SITE_URL);
 
-        await sendInBatches({ env, recipients: subscribers, template, ...strikeHandlers });
+        await broadcastToSubscribers(env, template);
       }
-      await invalidateListsIfNeeded();
       console.log(`[scheduled] ok cron="${cron}"`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
